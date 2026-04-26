@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { use, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Chart, registerables } from 'chart.js';
-import { fetchCompany, deleteCompany, updateCompany, fetchActivity, fetchOrderDrivers, fetchInvoices, fetchPayments, uploadCompanyLogo } from '@/lib/data';
+import { fetchCompany, deleteCompany, updateCompany, fetchActivity, fetchOrderDrivers, fetchInvoices, fetchPayments, uploadCompanyLogo, createOrder } from '@/lib/data';
 import { fmt, fmtDate, sBadge } from '@/lib/helpers';
 import { useModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
@@ -135,11 +135,52 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
     );
   }
 
+  function showNewOrder() {
+    openModal('Create new order',
+      <form id="create-order-form" onSubmit={async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget);
+        const btn = document.querySelector('button[form="create-order-form"]') as HTMLButtonElement;
+        if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
+        const { data: created, error } = await createOrder({
+          company_id: co.id, placed_by: fd.get('placed_by') as string,
+          start_datetime: fd.get('start_datetime') as string, start_address: fd.get('start_address') as string,
+          end_address: fd.get('end_address') as string, licence_required: fd.get('licence_required') as string,
+          company_rate: Number(fd.get('company_rate')) || co.rate_per_hour || 20, min_hours: Number(fd.get('min_hours')) || 8,
+          drivers_needed: Number(fd.get('drivers_needed')) || 1, status: 'draft', hours_done: 0,
+        });
+        
+        if (created) {
+          toast('Order created ✓');
+          closeModal();
+          router.push('/orders');
+        } else {
+          if (btn) { btn.disabled = false; btn.textContent = 'Create order'; }
+          toast(`Error: ${error?.message || 'Failed to create order'}`, 'err');
+        }
+      }}>
+        <div className="form-grid">
+          <FormField label="Placed by" id="of-pb" name="placed_by" value={co.contact_name} />
+          <FormField label="Start date/time" id="of-sd" name="start_datetime" type="datetime-local" required />
+          <FormField label="Start address" id="of-sa" name="start_address" value={co.address} required />
+          <FormField label="End address" id="of-ea" name="end_address" />
+          <FormField label="Licence required" id="of-lr" name="licence_required" value={co.licence_required} options={[{ v: '', l: '— Any —' }, { v: 'Class 1', l: 'Class 1' }, { v: 'Class 2', l: 'Class 2' }, { v: '7.5T', l: '7.5T' }, { v: 'Van', l: 'Van' }]} />
+          <FormField label="Company rate (£/hr)" id="of-cr" name="company_rate" type="number" value={co.rate_per_hour || 20} required />
+          <FormField label="Min hours" id="of-mh" name="min_hours" type="number" value={8} required />
+          <FormField label="Drivers needed" id="of-dn" name="drivers_needed" type="number" value={1} required />
+        </div>
+        <FormField label="Notes" id="of-notes" name="notes" />
+      </form>,
+      <><button className="btn btn-sm" onClick={closeModal}>Cancel</button><button type="submit" form="create-order-form" className="btn btn-primary btn-sm">Create order</button></>
+    );
+  }
+
   return (
     <>
       <div className="topbar">
         <div className="breadcrumb"><Link href="/companies" className="bc-link">Companies</Link><span className="bc-sep">›</span><span>{co.name}</span></div>
-        <div className="tbar-right"><button className="btn btn-sm" onClick={showEditCompany}>Edit</button><button className="btn btn-primary btn-sm">+ Create order</button></div>
+        <div className="tbar-right"><button className="btn btn-sm" onClick={showEditCompany}>Edit</button><button className="btn btn-primary btn-sm" onClick={showNewOrder}>+ Create order</button></div>
       </div>
       <div className="content">
         <div className="phero">
