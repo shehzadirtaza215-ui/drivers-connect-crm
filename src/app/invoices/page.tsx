@@ -2,38 +2,51 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { DEMO_INVOICES, DEMO_COMPANIES } from '@/lib/demo-data';
-import { createInvoice } from '@/lib/data';
+import { fetchInvoices, fetchCompanies, createInvoice, updateInvoice } from '@/lib/data';
 import { fmt, fmtDate, sBadge } from '@/lib/helpers';
 import { useModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import FormField from '@/components/ui/FormField';
+import type { Invoice, Company } from '@/lib/types';
 
 export default function InvoicesPage() {
   const { openModal, closeModal } = useModal();
   const { toast } = useToast();
-  const [invoices, setInvoices] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setInvoices(DEMO_INVOICES.filter(i => DEMO_COMPANIES.some(c => c.id === i.company_id)));
+    Promise.all([fetchInvoices(), fetchCompanies()]).then(([inv, co]) => {
+      setInvoices(inv);
+      setCompanies(co);
+      setLoading(false);
+    });
   }, []);
 
   const totals = { total: 0, paid: 0, outstanding: 0, overdue: 0 };
   invoices.forEach(i => { totals.total += i.amount; if (i.status === 'paid') totals.paid += i.amount; if (i.status === 'sent' || i.status === 'overdue') totals.outstanding += i.amount; if (i.status === 'overdue') totals.overdue += i.amount; });
 
-  function updateInvoiceStatus(id: number, status: string) {
-    setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, status, ...(status === 'paid' ? { paid_date: new Date().toISOString().split('T')[0] } : {}) } : inv));
-    toast(`Invoice ${status === 'sent' ? 'sent' : status === 'paid' ? 'marked paid' : 'updated'} ✓`);
+  async function updateInvoiceStatus(id: number, status: string) {
+    const updates: Partial<Invoice> = { status } as Partial<Invoice>;
+    if (status === 'paid') (updates as any).paid_date = new Date().toISOString().split('T')[0];
+    const result = await updateInvoice(id, updates);
+    if (result) {
+      setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, ...updates } : inv));
+      toast(`Invoice ${status === 'sent' ? 'sent' : status === 'paid' ? 'marked paid' : 'updated'} ✓`);
+    } else {
+      toast('Error updating invoice', 'err');
+    }
   }
 
   async function handleCreateInvoice(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const companyId = Number(fd.get('company_id'));
-    const co = DEMO_COMPANIES.find(c => c.id === companyId);
+    const co = companies.find(c => c.id === companyId);
     if (!co) return toast('Select a company', 'err');
 
-    const newInvoice: any = {
+    const newInvoice: Partial<Invoice> = {
       company_id: companyId,
       amount: Number(fd.get('amount')) || 0,
       issued_date: new Date().toISOString().split('T')[0],
@@ -43,8 +56,9 @@ export default function InvoicesPage() {
 
     const created = await createInvoice(newInvoice);
     if (created) {
-      DEMO_INVOICES.unshift(created);
-      setInvoices([...DEMO_INVOICES].filter(i => DEMO_COMPANIES.some(c => c.id === i.company_id)));
+      // Re-fetch to get company_name from join
+      const freshInvoices = await fetchInvoices();
+      setInvoices(freshInvoices);
       toast('Invoice created ✓');
       closeModal();
     } else {
@@ -55,7 +69,7 @@ export default function InvoicesPage() {
   function showNewInvoice() {
     openModal('New invoice',
       <form id="new-invoice-form" onSubmit={handleCreateInvoice}>
-        <FormField label="Company" id="if-co" name="company_id" options={[{ v: '', l: '— Select —' }, ...DEMO_COMPANIES.map(c => ({ v: String(c.id), l: c.name }))]} required />
+        <FormField label="Company" id="if-co" name="company_id" options={[{ v: '', l: '— Select —' }, ...companies.map(c => ({ v: String(c.id), l: c.name }))]} required />
         <div className="form-grid">
           <FormField label="Amount (£)" id="if-amt" name="amount" type="number" required />
           <FormField label="Due date" id="if-due" name="due_date" type="date" />
@@ -63,6 +77,16 @@ export default function InvoicesPage() {
         <FormField label="Notes" id="if-notes" name="notes" />
       </form>,
       <><button className="btn btn-sm" onClick={closeModal}>Cancel</button><button type="submit" form="new-invoice-form" className="btn btn-primary btn-sm">Create</button></>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ width: '40px', height: '40px', border: '3px solid var(--border)', borderTopColor: 'var(--brand)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <div style={{ color: 'var(--text2)', fontWeight: 500 }}>Loading invoices...</div>
+      </div>
     );
   }
 

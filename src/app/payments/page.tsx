@@ -2,27 +2,31 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { DEMO_DRIVERS, DEMO_COMPANIES, DEMO_PAYMENTS } from '@/lib/demo-data';
-import { createPayment } from '@/lib/data';
+import { fetchDrivers, fetchCompanies, fetchPayments, createPayment, markDriverShiftsPaid } from '@/lib/data';
 import { fmt, fmtDate, sBadge } from '@/lib/helpers';
 import { useModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import FormField from '@/components/ui/FormField';
+import type { Driver, Company, Payment } from '@/lib/types';
 
 export default function PaymentsPage() {
   const { openModal, closeModal } = useModal();
   const { toast } = useToast();
   const [expanded, setExpanded] = useState<number | null>(null);
-  const [payments, setPayments] = useState<any[]>([]);
-  const [pendingDrivers, setPendingDrivers] = useState<any[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [pendingDrivers, setPendingDrivers] = useState<Driver[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setPayments(DEMO_PAYMENTS.filter(p => {
-      if (p.driver_id) return DEMO_DRIVERS.some(d => d.id === p.driver_id);
-      if (p.company_id) return DEMO_COMPANIES.some(c => c.id === p.company_id);
-      return true;
-    }));
-    setPendingDrivers(DEMO_DRIVERS.filter(d => (d.pending_pay || 0) > 0));
+    Promise.all([fetchPayments(), fetchDrivers(), fetchCompanies()]).then(([pay, drv, co]) => {
+      setPayments(pay);
+      setDrivers(drv);
+      setCompanies(co);
+      setPendingDrivers(drv.filter(d => (d.pending_pay || 0) > 0));
+      setLoading(false);
+    });
   }, []);
 
   const totalDue = pendingDrivers.reduce((s, d) => s + (d.pending_pay || 0), 0);
@@ -40,7 +44,7 @@ export default function PaymentsPage() {
     if (isOut && !driverId) return toast('Select a driver', 'err');
     if (!isOut && !companyId) return toast('Select a company', 'err');
 
-    const newPayment: any = {
+    const newPayment: Partial<Payment> = {
       direction: isOut ? 'out' : 'in',
       amount: Number(fd.get('amount')) || 0,
       pay_date: fd.get('date') as string,
@@ -48,17 +52,14 @@ export default function PaymentsPage() {
       status: 'paid',
     };
 
-    if (isOut) newPayment.driver_id = driverId;
-    else newPayment.company_id = companyId;
+    if (isOut) (newPayment as any).driver_id = driverId;
+    else (newPayment as any).company_id = companyId;
 
     const created = await createPayment(newPayment);
     if (created) {
-      DEMO_PAYMENTS.unshift(created);
-      setPayments([...DEMO_PAYMENTS].filter(p => {
-        if (p.driver_id) return DEMO_DRIVERS.some(d => d.id === p.driver_id);
-        if (p.company_id) return DEMO_COMPANIES.some(c => c.id === p.company_id);
-        return true;
-      }));
+      // Re-fetch payments to get joined names
+      const freshPayments = await fetchPayments();
+      setPayments(freshPayments);
       toast('Payment logged ✓');
       closeModal();
     } else {
@@ -70,8 +71,8 @@ export default function PaymentsPage() {
     openModal('Log payment',
       <form id="log-payment-form" onSubmit={handleLogPayment}>
         <FormField label="Direction" id="pm-dir" name="direction" options={[{ v: 'out', l: 'OUT — Pay a driver' }, { v: 'in', l: 'IN — Received from company' }]} required />
-        <FormField label="Driver" id="pm-driver" name="driver_id" options={[{ v: '', l: '— Select driver —' }, ...DEMO_DRIVERS.map(d => ({ v: String(d.id), l: `${d.first_name} ${d.last_name} (${d.licence_category})` }))]} />
-        <FormField label="Company" id="pm-company" name="company_id" options={[{ v: '', l: '— Select company —' }, ...DEMO_COMPANIES.map(c => ({ v: String(c.id), l: c.name }))]} />
+        <FormField label="Driver" id="pm-driver" name="driver_id" options={[{ v: '', l: '— Select driver —' }, ...drivers.map(d => ({ v: String(d.id), l: `${d.first_name} ${d.last_name} (${d.licence_category})` }))]} />
+        <FormField label="Company" id="pm-company" name="company_id" options={[{ v: '', l: '— Select company —' }, ...companies.map(c => ({ v: String(c.id), l: c.name }))]} />
         <div className="form-grid">
           <FormField label="Amount (£)" id="pm-amt" name="amount" type="number" required />
           <FormField label="Date" id="pm-date" name="date" type="date" value={new Date().toISOString().split('T')[0]} required />
@@ -93,9 +94,28 @@ export default function PaymentsPage() {
     );
   }
 
-  function markPaid(driverId: number, name: string) {
-    toast(`${name} — marked as paid ✓`);
-    setExpanded(null);
+  async function markPaid(driverId: number, name: string, amount: number) {
+    const newPayment: Partial<Payment> = { direction: 'out', amount, driver_id: driverId, pay_date: new Date().toISOString().split('T')[0], method: 'bank_transfer', status: 'paid' };
+    const created = await createPayment(newPayment);
+    if (created) {
+      await markDriverShiftsPaid(driverId);
+      const [pay, drv] = await Promise.all([fetchPayments(), fetchDrivers()]);
+      setPayments(pay); setDrivers(drv); setPendingDrivers(drv.filter(d => (d.pending_pay || 0) > 0));
+      toast(`${name} — marked as paid ✓`);
+      setExpanded(null);
+    } else {
+      toast('Error logging payment', 'err');
+    }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ width: '40px', height: '40px', border: '3px solid var(--border)', borderTopColor: 'var(--brand)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <div style={{ color: 'var(--text2)', fontWeight: 500 }}>Loading payments...</div>
+      </div>
+    );
   }
 
   return (
@@ -133,7 +153,7 @@ export default function PaymentsPage() {
                     </label>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
                       <button className="btn btn-sm" onClick={() => setExpanded(null)}>Cancel</button>
-                      <button className="btn btn-primary btn-sm" onClick={() => markPaid(d.id, d.first_name + ' ' + d.last_name)}>Mark paid &amp; save proof</button>
+                      <button className="btn btn-primary btn-sm" onClick={() => markPaid(d.id, d.first_name + ' ' + d.last_name, d.pending_pay || 0)}>Mark paid &amp; save proof</button>
                     </div>
                   </div>
                 )}

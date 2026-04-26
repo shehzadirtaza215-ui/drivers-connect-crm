@@ -3,20 +3,29 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { DEMO_DRIVERS, DEMO_COMPANIES, DEMO_ORDERS } from '@/lib/demo-data';
+import { fetchDrivers, fetchCompanies, fetchOrders } from '@/lib/data';
 
 export default function Sidebar() {
   const pathname = usePathname();
   const [counts, setCounts] = useState({ drivers: 0, companies: 0, orders: 0 });
 
   useEffect(() => {
-    const iv = setInterval(() => {
+    async function loadCounts() {
+      const [drivers, companies, orders] = await Promise.all([
+        fetchDrivers(),
+        fetchCompanies(),
+        fetchOrders(),
+      ]);
       setCounts({
-        drivers: DEMO_DRIVERS.length,
-        companies: DEMO_COMPANIES.length,
-        orders: DEMO_ORDERS.filter(o => o.status === 'draft' || o.status === 'active').length
+        drivers: drivers.length,
+        companies: companies.length,
+        orders: orders.filter(o => o.status === 'draft' || o.status === 'active').length,
       });
-    }, 1000);
+    }
+    loadCounts();
+
+    // Refresh counts every 30 seconds
+    const iv = setInterval(loadCounts, 30000);
     return () => clearInterval(iv);
   }, []);
 

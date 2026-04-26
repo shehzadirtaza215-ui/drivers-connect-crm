@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Chart, registerables } from 'chart.js';
-import { DEMO_DRIVERS, DEMO_COMPANIES, DEMO_ORDERS, DEMO_INVOICES, DEMO_PAYMENTS, DEMO_COMPLIANCE } from '@/lib/demo-data';
+import { fetchDrivers, fetchCompanies, fetchOrders, fetchInvoices, fetchPayments, fetchCompliance } from '@/lib/data';
 import { fmt, fmtDate } from '@/lib/helpers';
+import type { Driver, Company, Order, Invoice, Payment, ComplianceAlert } from '@/lib/types';
 
 Chart.register(...registerables);
 
@@ -14,35 +15,64 @@ export default function DashboardPage() {
   const chartRevRef = useRef<Chart | null>(null);
   const chartCatRef = useRef<Chart | null>(null);
 
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [compliance, setCompliance] = useState<ComplianceAlert[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetchDrivers(),
+      fetchCompanies(),
+      fetchOrders(),
+      fetchInvoices(),
+      fetchPayments(),
+      fetchCompliance(),
+    ]).then(([d, co, o, inv, pay, comp]) => {
+      setDrivers(d);
+      setCompanies(co);
+      setOrders(o);
+      setInvoices(inv);
+      setPayments(pay);
+      setCompliance(comp);
+      setLoading(false);
+    });
+  }, []);
+
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 
-  const totalDrivers = DEMO_DRIVERS.length;
-  const activeCompanies = DEMO_COMPANIES.length;
-  const openOrders = DEMO_ORDERS.filter(o => o.status === 'draft' || o.status === 'active').length;
-  const pendingFromCo = DEMO_INVOICES.filter(i => i.status !== 'paid').reduce((s, i) => s + i.amount, 0);
-  const payrollDue = DEMO_DRIVERS.reduce((s, d) => s + (d.pending_pay || 0), 0);
-  const revenueIn = DEMO_PAYMENTS.filter(p => p.direction === 'in').reduce((s, p) => s + p.amount, 0);
+  const totalDrivers = drivers.length;
+  const activeCompanies = companies.length;
+  const openOrders = orders.filter(o => o.status === 'draft' || o.status === 'active').length;
+  const pendingFromCo = invoices.filter(i => i.status !== 'paid').reduce((s, i) => s + i.amount, 0);
+  const payrollDue = drivers.reduce((s, d) => s + (d.pending_pay || 0), 0);
+  const revenueIn = payments.filter(p => p.direction === 'in').reduce((s, p) => s + p.amount, 0);
 
-  const recentDrivers = [...DEMO_DRIVERS].reverse().slice(0, 3);
+  const recentDrivers = [...drivers].reverse().slice(0, 3);
   
-  const activeAlerts = DEMO_COMPLIANCE.filter(a => {
-    if (a.driver_id) return DEMO_DRIVERS.some(d => d.id === a.driver_id);
-    if (a.company_id) return DEMO_COMPANIES.some(c => c.id === a.company_id);
+  const activeAlerts = compliance.filter(a => {
+    if (a.driver_id) return drivers.some(d => d.id === a.driver_id);
+    if (a.company_id) return companies.some(c => c.id === a.company_id);
     return true;
   }).slice(0, 3);
 
-  const payrollDrivers = DEMO_DRIVERS.filter(d => (d.pending_pay || 0) > 0).slice(0, 3);
+  const payrollDrivers = drivers.filter(d => (d.pending_pay || 0) > 0).slice(0, 3);
 
   // Compute licence category distribution from actual drivers
   const licCounts: Record<string, number> = {};
-  DEMO_DRIVERS.forEach(d => { if (d.licence_category) licCounts[d.licence_category] = (licCounts[d.licence_category] || 0) + 1; });
+  drivers.forEach(d => { if (d.licence_category) licCounts[d.licence_category] = (licCounts[d.licence_category] || 0) + 1; });
   const licLabels = Object.keys(licCounts);
   const licData = Object.values(licCounts);
   const licColors = ['#E8460A', '#185fa5', '#2d7a3a', '#888', '#c93a08', '#6b21a8'];
   const totalLic = licData.reduce((a, b) => a + b, 0) || 1;
 
   useEffect(() => {
+    if (loading) return;
+
     const mkO = () => ({
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
@@ -55,7 +85,7 @@ export default function DashboardPage() {
     if (revenueRef.current && !chartRevRef.current) {
       // Build revenue chart from real payment data
       const monthlyRev: Record<string, number> = {};
-      DEMO_PAYMENTS.filter(p => p.direction === 'in').forEach(p => {
+      payments.filter(p => p.direction === 'in').forEach(p => {
         const d = new Date(p.pay_date);
         const key = d.toLocaleDateString('en-GB', { month: 'short' });
         monthlyRev[key] = (monthlyRev[key] || 0) + p.amount;
@@ -77,7 +107,17 @@ export default function DashboardPage() {
       });
     }
     return () => { chartRevRef.current?.destroy(); chartRevRef.current = null; chartCatRef.current?.destroy(); chartCatRef.current = null; };
-  }, []);
+  }, [loading, payments, licLabels, licData]);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ width: '40px', height: '40px', border: '3px solid var(--border)', borderTopColor: 'var(--brand)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <div style={{ color: 'var(--text2)', fontWeight: 500 }}>Loading dashboard...</div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -94,7 +134,7 @@ export default function DashboardPage() {
           <Link href="/companies" className="mcard"><div className="mcard-label">Active companies</div><div className="mcard-val">{activeCompanies}</div><div className="mcard-sub">{activeCompanies > 0 ? `${activeCompanies} active` : 'None yet'}</div></Link>
           <Link href="/orders" className="mcard"><div className="mcard-label">Open orders</div><div className="mcard-val va">{openOrders}</div><div className="mcard-sub">{openOrders > 0 ? `${openOrders} in progress` : 'No open orders'}</div></Link>
           <Link href="/payments" className="mcard"><div className="mcard-label">Revenue (in)</div><div className="mcard-val vg">£{fmt(revenueIn)}</div><div className="mcard-sub" style={{ color: revenueIn > 0 ? 'var(--green-mid)' : undefined }}>{revenueIn > 0 ? 'From company payments' : 'No payments yet'}</div></Link>
-          <Link href="/invoices" className="mcard"><div className="mcard-label">Pending from co.</div><div className="mcard-val va">£{fmt(pendingFromCo)}</div><div className="mcard-sub">{DEMO_INVOICES.filter(i => i.status !== 'paid').length} invoices outstanding</div></Link>
+          <Link href="/invoices" className="mcard"><div className="mcard-label">Pending from co.</div><div className="mcard-val va">£{fmt(pendingFromCo)}</div><div className="mcard-sub">{invoices.filter(i => i.status !== 'paid').length} invoices outstanding</div></Link>
           <Link href="/payments" className="mcard"><div className="mcard-label">Payroll due</div><div className="mcard-val vr">£{fmt(payrollDue)}</div><div className="mcard-sub">{payrollDrivers.length > 0 ? `${payrollDrivers.length} drivers pending` : 'All clear'}</div></Link>
         </div>
 

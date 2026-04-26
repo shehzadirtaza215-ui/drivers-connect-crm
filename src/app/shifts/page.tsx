@@ -1,42 +1,24 @@
 'use client';
 
-import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { DEMO_SHIFTS, DEMO_DRIVERS, DEMO_COMPANIES, DEMO_ORDERS } from '@/lib/demo-data';
+import { fetchShifts } from '@/lib/data';
 import { fmt, fmtDate, sBadge } from '@/lib/helpers';
+import type { Shift } from '@/lib/types';
 
 export default function ShiftsPage() {
-  const [shifts, setShifts] = useState<any[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Build shifts from completed/active orders that have assigned drivers
-    const realShifts = DEMO_ORDERS
-      .filter(o => o.driver_names && (o.status === 'completed' || o.status === 'active'))
-      .map(o => {
-        const co = DEMO_COMPANIES.find(c => c.id === o.company_id);
-        const driverRate = (o.company_rate || 0) * 0.75;
-        return {
-          id: o.id,
-          driver_id: 0,
-          driver_name: o.driver_names || 'Unknown',
-          company_id: o.company_id,
-          company_name: co?.name || o.company_name || 'Unknown',
-          order_ref: o.order_ref,
-          start_datetime: o.start_datetime,
-          hours_done: o.hours_done || 0,
-          driver_pay: (o.hours_done || 0) * driverRate,
-          billed: (o.hours_done || 0) * (o.company_rate || 0),
-          margin: (o.hours_done || 0) * ((o.company_rate || 0) - driverRate),
-          status: o.status,
-        };
-      });
-    setShifts(realShifts);
+    fetchShifts().then(data => { setShifts(data); setLoading(false); });
   }, []);
 
   const totalShifts = shifts.length;
   const totalHours = shifts.reduce((s, sh) => s + (sh.hours_done || 0), 0);
   const totalRevenue = shifts.reduce((s, sh) => s + (sh.billed || 0), 0);
   const totalMargin = shifts.reduce((s, sh) => s + (sh.margin || 0), 0);
+
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', flexDirection: 'column', gap: '16px' }}><div style={{ width: '40px', height: '40px', border: '3px solid var(--border)', borderTopColor: 'var(--brand)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div><style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style><div style={{ color: 'var(--text2)', fontWeight: 500 }}>Loading shifts...</div></div>;
 
   return (
     <>
@@ -63,7 +45,7 @@ export default function ShiftsPage() {
                   <td>£{fmt(s.driver_pay)}</td>
                   <td>£{fmt(s.billed)}</td>
                   <td style={{ color: 'var(--green-mid)', fontWeight: 600 }}>£{fmt(s.margin)}</td>
-                  <td><span className={`badge badge-${sBadge(s.status)}`}>{s.status === 'active' ? 'Live' : s.status}</span></td>
+                  <td><span className={`badge badge-${sBadge(s.status)}`}>{s.status}</span></td>
                 </tr>
               ))}
             </tbody>

@@ -2,23 +2,34 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { DEMO_COMPLIANCE, DEMO_DRIVERS, DEMO_COMPANIES } from '@/lib/demo-data';
+import { fetchCompliance } from '@/lib/data';
 import { fmtDate, isExp, dLeft } from '@/lib/helpers';
+import type { ComplianceAlert } from '@/lib/types';
 
 export default function CompliancePage() {
-  const [alerts, setAlerts] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<ComplianceAlert[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setAlerts(DEMO_COMPLIANCE.filter(a => {
-      if (a.driver_id) return DEMO_DRIVERS.some(d => d.id === a.driver_id);
-      if (a.company_id) return DEMO_COMPANIES.some(c => c.id === a.company_id);
-      return true;
-    }));
+    fetchCompliance().then(data => {
+      setAlerts(data);
+      setLoading(false);
+    });
   }, []);
 
   const expired = alerts.filter(a => isExp(a.expiry_date)).length;
   const expiringSoon = alerts.filter(a => !isExp(a.expiry_date) && (dLeft(a.expiry_date) || 999) <= 30).length;
   const allClear = alerts.filter(a => !isExp(a.expiry_date) && (dLeft(a.expiry_date) || 999) > 30).length;
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ width: '40px', height: '40px', border: '3px solid var(--border)', borderTopColor: 'var(--brand)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <div style={{ color: 'var(--text2)', fontWeight: 500 }}>Loading compliance...</div>
+      </div>
+    );
+  }
 
   return (
     <>
