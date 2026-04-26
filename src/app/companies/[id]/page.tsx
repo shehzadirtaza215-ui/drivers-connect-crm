@@ -2,8 +2,10 @@
 
 import Link from 'next/link';
 import { use, useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Chart, registerables } from 'chart.js';
-import { DEMO_COMPANIES, DEMO_DRIVERS, DEMO_ACTIVITY } from '@/lib/demo-data';
+import { fetchCompany, deleteCompany } from '@/lib/data';
+import { DEMO_DRIVERS, DEMO_ACTIVITY } from '@/lib/demo-data';
 import { fmt, fmtDate, sBadge } from '@/lib/helpers';
 import { useModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
@@ -13,13 +15,18 @@ Chart.register(...registerables);
 
 export default function CompanyProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const co = DEMO_COMPANIES.find(c => c.id === Number(id)) || DEMO_COMPANIES[0];
+  const router = useRouter();
+  const [co, setCompany] = useState<any>(null);
   const [activeTab, setActiveTab] = useState(0);
   const { openModal, closeModal } = useModal();
   const { toast } = useToast();
   const chartRef = useRef<HTMLCanvasElement>(null);
   const chartInst = useRef<Chart | null>(null);
   const tabs = ['Finance', 'All orders', 'Drivers', 'Invoices', 'Activity log'];
+
+  useEffect(() => {
+    fetchCompany(Number(id)).then(setCompany);
+  }, [id]);
 
   const companyOrders = [
     { ref: 'ORD-041', driver: 'James Mitchell', dId: 1, date: '17 Apr 2026', hours: '9.5h', cost: '£142.50', billed: '£190', margin: '£47.50', status: 'completed' },
@@ -41,6 +48,8 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
     return () => { if (activeTab !== 0) { chartInst.current?.destroy(); chartInst.current = null; } };
   }, [activeTab]);
 
+  if (!co) return <div style={{ padding: '20px' }}>Loading company...</div>;
+
   function showEditCompany() {
     openModal(`Edit company — ${co.name}`,
       <div>
@@ -54,12 +63,11 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
         <div className="form-grid"><FormField label="Licence required" id="cf-lic" value={co.licence_required} options={[{ v: '', l: 'Any' }, { v: 'Class 1', l: 'Class 1' }, { v: 'Class 2', l: 'Class 2' }, { v: '7.5T', l: '7.5T' }]} /><FormField label="Rate (£/hr)" id="cf-rate" type="number" value={co.rate_per_hour} /><FormField label="Payment terms (days)" id="cf-terms" type="number" value={co.payment_terms_days} /></div>
       </div>,
       <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between' }}>
-        <button className="btn btn-sm" style={{ color: 'var(--red)', background: 'rgba(232, 70, 10, 0.08)' }} onClick={() => {
-          const idx = DEMO_COMPANIES.findIndex(c => c.id === co.id);
-          if (idx !== -1) DEMO_COMPANIES.splice(idx, 1);
-          toast('Company deleted');
+        <button className="btn btn-sm" style={{ color: 'var(--red)', background: 'rgba(232, 70, 10, 0.08)' }} onClick={async () => {
+          await deleteCompany(co.id);
+          toast('Company deleted ✓');
           closeModal();
-          window.location.href = '/companies';
+          router.push('/companies');
         }}>Delete company</button>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="btn btn-sm" onClick={closeModal}>Cancel</button>

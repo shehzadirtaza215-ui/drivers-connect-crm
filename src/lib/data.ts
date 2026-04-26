@@ -56,6 +56,17 @@ export async function updateDriver(id: number, updates: Partial<Driver>): Promis
   return data;
 }
 
+export async function deleteDriver(id: number): Promise<boolean> {
+  if (USE_DEMO) {
+    const idx = DEMO_DRIVERS.findIndex(d => d.id === id);
+    if (idx !== -1) DEMO_DRIVERS.splice(idx, 1);
+    return true;
+  }
+  const { error } = await supabase().from('drivers').delete().eq('id', id);
+  if (error) { console.error('deleteDriver error:', error); return false; }
+  return true;
+}
+
 // ═══════ COMPANIES ═══════
 
 export async function fetchCompanies(): Promise<Company[]> {
@@ -84,6 +95,17 @@ export async function updateCompany(id: number, updates: Partial<Company>): Prom
   const { data, error } = await supabase().from('companies').update(updates as never).eq('id', id).select().single();
   if (error) { console.error('updateCompany error:', error); return null; }
   return data;
+}
+
+export async function deleteCompany(id: number): Promise<boolean> {
+  if (USE_DEMO) {
+    const idx = DEMO_COMPANIES.findIndex(c => c.id === id);
+    if (idx !== -1) DEMO_COMPANIES.splice(idx, 1);
+    return true;
+  }
+  const { error } = await supabase().from('companies').delete().eq('id', id);
+  if (error) { console.error('deleteCompany error:', error); return false; }
+  return true;
 }
 
 // ═══════ ORDERS ═══════
@@ -116,6 +138,17 @@ export async function updateOrder(id: number, updates: Partial<Order>): Promise<
   return data;
 }
 
+export async function deleteOrder(id: number): Promise<boolean> {
+  if (USE_DEMO) {
+    const idx = DEMO_ORDERS.findIndex(o => o.id === id);
+    if (idx !== -1) DEMO_ORDERS.splice(idx, 1);
+    return true;
+  }
+  const { error } = await supabase().from('orders').delete().eq('id', id);
+  if (error) { console.error('deleteOrder error:', error); return false; }
+  return true;
+}
+
 // ═══════ INVOICES ═══════
 
 export async function fetchInvoices(): Promise<Invoice[]> {
@@ -142,6 +175,17 @@ export async function updateInvoice(id: number, updates: Partial<Invoice>): Prom
   return data;
 }
 
+export async function deleteInvoice(id: number): Promise<boolean> {
+  if (USE_DEMO) {
+    const idx = DEMO_INVOICES.findIndex(i => i.id === id);
+    if (idx !== -1) DEMO_INVOICES.splice(idx, 1);
+    return true;
+  }
+  const { error } = await supabase().from('invoices').delete().eq('id', id);
+  if (error) { console.error('deleteInvoice error:', error); return false; }
+  return true;
+}
+
 // ═══════ PAYMENTS ═══════
 
 export async function fetchPayments(): Promise<Payment[]> {
@@ -162,6 +206,17 @@ export async function createPayment(payment: Partial<Payment>): Promise<Payment 
   const { data, error } = await supabase().from('payments').insert(payment as never).select().single();
   if (error) { console.error('createPayment error:', error); return null; }
   return data;
+}
+
+export async function deletePayment(id: number): Promise<boolean> {
+  if (USE_DEMO) {
+    const idx = DEMO_PAYMENTS.findIndex(p => p.id === id);
+    if (idx !== -1) DEMO_PAYMENTS.splice(idx, 1);
+    return true;
+  }
+  const { error } = await supabase().from('payments').delete().eq('id', id);
+  if (error) { console.error('deletePayment error:', error); return false; }
+  return true;
 }
 
 // ═══════ SHIFTS (from order_drivers join) ═══════

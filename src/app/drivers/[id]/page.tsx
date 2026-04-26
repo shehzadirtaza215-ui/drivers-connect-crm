@@ -2,8 +2,10 @@
 
 import Link from 'next/link';
 import { use, useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Chart, registerables } from 'chart.js';
-import { DEMO_DRIVERS, DEMO_ACTIVITY } from '@/lib/demo-data';
+import { fetchDriver, deleteDriver } from '@/lib/data';
+import { DEMO_ACTIVITY } from '@/lib/demo-data';
 import { fmt, fmtDate, isExp } from '@/lib/helpers';
 import { useModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
@@ -13,13 +15,18 @@ Chart.register(...registerables);
 
 export default function DriverProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const driver = DEMO_DRIVERS.find(d => d.id === Number(id)) || DEMO_DRIVERS[0];
+  const router = useRouter();
+  const [driver, setDriver] = useState<any>(null);
   const [activeTab, setActiveTab] = useState(0);
   const { openModal, closeModal } = useModal();
   const { toast } = useToast();
   const chartRef = useRef<HTMLCanvasElement>(null);
   const chartInst = useRef<Chart | null>(null);
   const tabs = ['Personal info', 'Documents', 'All orders & runs', 'All payments', 'Activity log'];
+
+  useEffect(() => {
+    fetchDriver(Number(id)).then(setDriver);
+  }, [id]);
 
   useEffect(() => {
     if (activeTab === 2 && chartRef.current && !chartInst.current) {
@@ -33,13 +40,7 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
     return () => { if (activeTab !== 2) { chartInst.current?.destroy(); chartInst.current = null; } };
   }, [activeTab]);
 
-  const driverOrders = [
-    { ref: 'ORD-041', company: 'DHL Logistics', coId: 1, date: '17 Apr 2026', route: 'Glasgow → Leeds', hours: '9.5h', pay: '£142.50', billed: '£190.00', margin: '£47.50', status: 'Completed' },
-    { ref: 'ORD-038', company: 'DHL Logistics', coId: 1, date: '14 Apr 2026', route: 'Glasgow → Manchester', hours: '11h', pay: '£165.00', billed: '£220.00', margin: '£55.00', status: 'Completed' },
-    { ref: 'ORD-035', company: 'Amazon FC', coId: 2, date: '10 Apr 2026', route: 'Dunfermline DC', hours: '8h', pay: '£120.00', billed: '£160.00', margin: '£40.00', status: 'Completed' },
-    { ref: 'ORD-031', company: 'DHL Logistics', coId: 1, date: '4 Apr 2026', route: 'Glasgow → Leeds', hours: '9h', pay: '£135.00', billed: '£180.00', margin: '£45.00', status: 'Completed' },
-    { ref: 'ORD-028', company: 'Royal Mail', coId: 4, date: '28 Mar 2026', route: 'Glasgow Hub', hours: '—', pay: '—', billed: '—', margin: '—', status: 'Cancelled' },
-  ];
+  if (!driver) return <div style={{ padding: '20px' }}>Loading driver...</div>;
 
   function showEditDriver() {
     openModal(`Edit driver — ${driver.first_name} ${driver.last_name}`,
@@ -74,12 +75,11 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
         </div>
       </div>,
       <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between' }}>
-        <button className="btn btn-sm" style={{ color: 'var(--red)', background: 'rgba(232, 70, 10, 0.08)' }} onClick={() => {
-          const idx = DEMO_DRIVERS.findIndex(d => d.id === driver.id);
-          if (idx !== -1) DEMO_DRIVERS.splice(idx, 1);
-          toast('Driver deleted');
+        <button className="btn btn-sm" style={{ color: 'var(--red)', background: 'rgba(232, 70, 10, 0.08)' }} onClick={async () => {
+          await deleteDriver(driver.id);
+          toast('Driver deleted ✓');
           closeModal();
-          window.location.href = '/drivers';
+          router.push('/drivers');
         }}>Delete driver</button>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="btn btn-sm" onClick={closeModal}>Cancel</button>

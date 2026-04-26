@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { DEMO_COMPANIES } from '@/lib/demo-data';
+import { useState, useEffect } from 'react';
+import { fetchCompanies, createCompany } from '@/lib/data';
 import { fmt } from '@/lib/helpers';
 import { useModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
@@ -11,38 +11,37 @@ import FormField from '@/components/ui/FormField';
 export default function CompaniesPage() {
   const { openModal, closeModal } = useModal();
   const { toast } = useToast();
-  const [companies, setCompanies] = useState(DEMO_COMPANIES);
+  const [companies, setCompanies] = useState<any[]>([]);
 
-  function handleAddCompany(e: React.FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    fetchCompanies().then(setCompanies);
+  }, []);
+
+  async function handleAddCompany(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const newId = DEMO_COMPANIES.length > 0 ? Math.max(...DEMO_COMPANIES.map(c => c.id)) + 1 : 1;
     const newCompany: any = {
-      id: newId,
       code: fd.get('code') as string,
       name: fd.get('name') as string,
       contact_name: fd.get('contact_name') as string,
-      contact_email: fd.get('contact_email') as string,
-      contact_phone: fd.get('contact_phone') as string,
+      email: fd.get('email') as string,
+      phone: fd.get('phone') as string,
       address: fd.get('address') as string,
-      licence_required: fd.get('licence_required') as string,
-      rate_per_hour: Number(fd.get('rate_per_hour')) || 0,
-      payment_terms_days: Number(fd.get('payment_terms_days')) || 14,
+      primary_licence: fd.get('primary_licence') as string,
+      payment_terms_days: Number(fd.get('payment_terms_days')) || 30,
       status: 'active',
       avatar_color: '#1a1a2e',
       avatar_text_color: '#fff',
-      created_at: new Date().toISOString(),
-      total_orders: 0,
-      total_hours: 0,
-      total_billed: 0,
-      total_paid: 0,
-      outstanding: 0,
-      driver_count: 0
     };
-    DEMO_COMPANIES.push(newCompany);
-    setCompanies([...DEMO_COMPANIES]);
-    toast('Company added ✓');
-    closeModal();
+    
+    const created = await createCompany(newCompany);
+    if (created) {
+      setCompanies(prev => [created, ...prev]);
+      toast('Company added successfully ✓');
+      closeModal();
+    } else {
+      toast('Error adding company', 'err');
+    }
   }
 
   function showAddCompany() {

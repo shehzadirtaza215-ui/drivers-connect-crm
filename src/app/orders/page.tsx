@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DEMO_ORDERS, DEMO_DRIVERS, DEMO_COMPANIES } from '@/lib/demo-data';
+import { createOrder, updateOrder } from '@/lib/data';
 import { fmt, fmtDate, sBadge } from '@/lib/helpers';
 import { useModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
@@ -16,19 +17,15 @@ export default function OrdersPage() {
 
   const filtered = statusFilter === 'all' ? orders : orders.filter(o => o.status === statusFilter);
 
-  function handleCreateOrder(e: React.FormEvent<HTMLFormElement>) {
+  async function handleCreateOrder(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const coId = Number(fd.get('company_id'));
     const co = DEMO_COMPANIES.find(c => c.id === coId);
     if (!co) return;
 
-    const newId = DEMO_ORDERS.length > 0 ? Math.max(...DEMO_ORDERS.map(o => o.id)) + 1 : 1;
     const newOrder: any = {
-      id: newId,
-      order_ref: `ORD-${String(newId + 40).padStart(3, '0')}`,
       company_id: coId,
-      company_name: co.name,
       placed_by: fd.get('placed_by') as string,
       start_datetime: fd.get('start_datetime') as string,
       start_address: fd.get('start_address') as string,
@@ -39,15 +36,20 @@ export default function OrdersPage() {
       drivers_needed: Number(fd.get('drivers_needed')) || 1,
       status: 'draft',
       hours_done: 0,
-      created_at: new Date().toISOString().split('T')[0]
     };
-    DEMO_ORDERS.unshift(newOrder);
-    setOrders([...DEMO_ORDERS].filter(o => DEMO_COMPANIES.some(c => c.id === o.company_id)));
-    toast('Order created ✓');
-    closeModal();
+    
+    const created = await createOrder(newOrder);
+    if (created) {
+      DEMO_ORDERS.unshift(created);
+      setOrders([...DEMO_ORDERS].filter(o => DEMO_COMPANIES.some(c => c.id === o.company_id)));
+      toast('Order created ✓');
+      closeModal();
+    } else {
+      toast('Error creating order', 'err');
+    }
   }
 
-  function handleAssignDriver(e: React.FormEvent<HTMLFormElement>, orderId: number) {
+  async function handleAssignDriver(e: React.FormEvent<HTMLFormElement>, orderId: number) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const driverId = Number(fd.get('adr'));
@@ -56,32 +58,36 @@ export default function OrdersPage() {
     const driver = DEMO_DRIVERS.find(d => d.id === driverId);
     if (!driver) return;
 
-    const orderIndex = DEMO_ORDERS.findIndex(o => o.id === orderId);
-    if (orderIndex !== -1) {
-      DEMO_ORDERS[orderIndex].status = 'active';
-      DEMO_ORDERS[orderIndex].driver_names = `${driver.first_name} ${driver.last_name}`;
+    const updated = await updateOrder(orderId, { status: 'active' });
+    if (updated) {
+      const orderIndex = DEMO_ORDERS.findIndex(o => o.id === orderId);
+      if (orderIndex !== -1) {
+        DEMO_ORDERS[orderIndex].status = 'active';
+        DEMO_ORDERS[orderIndex].driver_names = `${driver.first_name} ${driver.last_name}`;
+      }
+      setOrders([...DEMO_ORDERS].filter(o => DEMO_COMPANIES.some(c => c.id === o.company_id)));
+      toast('Driver assigned ✓');
+      closeModal();
     }
-
-    setOrders([...DEMO_ORDERS].filter(o => DEMO_COMPANIES.some(c => c.id === o.company_id)));
-    toast('Driver assigned ✓');
-    closeModal();
   }
 
-  function handleCompleteOrder(e: React.FormEvent<HTMLFormElement>, orderId: number) {
+  async function handleCompleteOrder(e: React.FormEvent<HTMLFormElement>, orderId: number) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const hrs = Number(fd.get('hours_done'));
     if (hrs <= 0) return toast('Enter valid hours done', 'err');
 
-    const orderIndex = DEMO_ORDERS.findIndex(o => o.id === orderId);
-    if (orderIndex !== -1) {
-      DEMO_ORDERS[orderIndex].status = 'completed';
-      DEMO_ORDERS[orderIndex].hours_done = hrs;
+    const updated = await updateOrder(orderId, { status: 'completed', hours_done: hrs });
+    if (updated) {
+      const orderIndex = DEMO_ORDERS.findIndex(o => o.id === orderId);
+      if (orderIndex !== -1) {
+        DEMO_ORDERS[orderIndex].status = 'completed';
+        DEMO_ORDERS[orderIndex].hours_done = hrs;
+      }
+      setOrders([...DEMO_ORDERS].filter(o => DEMO_COMPANIES.some(c => c.id === o.company_id)));
+      toast('Order completed ✓');
+      closeModal();
     }
-
-    setOrders([...DEMO_ORDERS].filter(o => DEMO_COMPANIES.some(c => c.id === o.company_id)));
-    toast('Order completed ✓');
-    closeModal();
   }
 
   function showNewOrder() {

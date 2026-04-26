@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { DEMO_INVOICES, DEMO_COMPANIES } from '@/lib/demo-data';
+import { createInvoice } from '@/lib/data';
 import { fmt, fmtDate, sBadge } from '@/lib/helpers';
 import { useModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
@@ -25,29 +26,30 @@ export default function InvoicesPage() {
     toast(`Invoice ${status === 'sent' ? 'sent' : status === 'paid' ? 'marked paid' : 'updated'} ✓`);
   }
 
-  function handleCreateInvoice(e: React.FormEvent<HTMLFormElement>) {
+  async function handleCreateInvoice(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const companyId = Number(fd.get('company_id'));
     const co = DEMO_COMPANIES.find(c => c.id === companyId);
     if (!co) return toast('Select a company', 'err');
 
-    const newId = DEMO_INVOICES.length > 0 ? Math.max(...DEMO_INVOICES.map(i => i.id)) + 1 : 1;
     const newInvoice: any = {
-      id: newId,
-      invoice_ref: `INV-2026-${String(newId + 21).padStart(3, '0')}`,
       company_id: companyId,
-      company_name: co.name,
       amount: Number(fd.get('amount')) || 0,
       issued_date: new Date().toISOString().split('T')[0],
       due_date: fd.get('due_date') as string,
       status: 'sent'
     };
 
-    DEMO_INVOICES.unshift(newInvoice);
-    setInvoices([...DEMO_INVOICES].filter(i => DEMO_COMPANIES.some(c => c.id === i.company_id)));
-    toast('Invoice created ✓');
-    closeModal();
+    const created = await createInvoice(newInvoice);
+    if (created) {
+      DEMO_INVOICES.unshift(created);
+      setInvoices([...DEMO_INVOICES].filter(i => DEMO_COMPANIES.some(c => c.id === i.company_id)));
+      toast('Invoice created ✓');
+      closeModal();
+    } else {
+      toast('Error creating invoice', 'err');
+    }
   }
 
   function showNewInvoice() {

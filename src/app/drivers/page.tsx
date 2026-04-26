@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { DEMO_DRIVERS } from '@/lib/demo-data';
+import { useState, useEffect } from 'react';
+import { fetchDrivers, createDriver } from '@/lib/data';
 import { fmt, fmtDate, isExp, sBadge } from '@/lib/helpers';
 import { useModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
@@ -11,20 +11,22 @@ import FormField from '@/components/ui/FormField';
 export default function DriversPage() {
   const { openModal, closeModal } = useModal();
   const { toast } = useToast();
-  const [drivers, setDrivers] = useState(DEMO_DRIVERS);
+  const [drivers, setDrivers] = useState<any[]>([]);
   const [filter, setFilter] = useState('all');
+
+  useEffect(() => {
+    fetchDrivers().then(setDrivers);
+  }, []);
 
   const filtered = filter === 'all' ? drivers : drivers.filter(d => d.licence_category === filter);
 
-  function handleAddDriver(e: React.FormEvent<HTMLFormElement>) {
+  async function handleAddDriver(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const newId = DEMO_DRIVERS.length > 0 ? Math.max(...DEMO_DRIVERS.map(d => d.id)) + 1 : 1;
     const newDriver: any = {
-      id: newId,
+      initials: `${(fd.get('first_name') as string)[0]}${(fd.get('last_name') as string)[0]}`.toUpperCase(),
       first_name: fd.get('first_name') as string,
       last_name: fd.get('last_name') as string,
-      initials: `${(fd.get('first_name') as string)[0]}${(fd.get('last_name') as string)[0]}`.toUpperCase(),
       phone: fd.get('phone') as string,
       email: fd.get('email') as string,
       address: fd.get('address') as string,
@@ -35,14 +37,16 @@ export default function DriversPage() {
       status: fd.get('status') as string || 'available',
       avatar_color: '#e8f1fb',
       avatar_text_color: '#185fa5',
-      created_at: new Date().toISOString(),
-      total_hours: 0,
-      total_earned: 0,
     };
-    DEMO_DRIVERS.push(newDriver);
-    setDrivers([...DEMO_DRIVERS]);
-    toast('Driver added ✓');
-    closeModal();
+    
+    const created = await createDriver(newDriver);
+    if (created) {
+      setDrivers(prev => [created, ...prev]);
+      toast('Driver added successfully ✓');
+      closeModal();
+    } else {
+      toast('Error adding driver', 'err');
+    }
   }
 
   function showAddDriver() {

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { DEMO_DRIVERS, DEMO_COMPANIES, DEMO_PAYMENTS } from '@/lib/demo-data';
+import { createPayment } from '@/lib/data';
 import { fmt, fmtDate, sBadge } from '@/lib/helpers';
 import { useModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
@@ -26,10 +27,9 @@ export default function PaymentsPage() {
 
   const totalDue = pendingDrivers.reduce((s, d) => s + (d.pending_pay || 0), 0);
 
-  function handleLogPayment(e: React.FormEvent<HTMLFormElement>) {
+  async function handleLogPayment(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const newId = DEMO_PAYMENTS.length > 0 ? Math.max(...DEMO_PAYMENTS.map(p => p.id)) + 1 : 1;
     const isOut = fd.get('direction') === 'out';
     const driverId = Number(fd.get('driver_id'));
     const companyId = Number(fd.get('company_id'));
@@ -38,8 +38,6 @@ export default function PaymentsPage() {
     if (!isOut && !companyId) return toast('Select a company', 'err');
 
     const newPayment: any = {
-      id: newId,
-      payment_ref: `PAY-${String(newId + 210).padStart(3, '0')}`,
       direction: isOut ? 'out' : 'in',
       amount: Number(fd.get('amount')) || 0,
       pay_date: fd.get('date') as string,
@@ -47,22 +45,22 @@ export default function PaymentsPage() {
       status: 'paid',
     };
 
-    if (isOut) {
-      newPayment.driver_id = driverId;
-      newPayment.driver_name = DEMO_DRIVERS.find(d => d.id === driverId)?.first_name + ' ' + DEMO_DRIVERS.find(d => d.id === driverId)?.last_name;
-    } else {
-      newPayment.company_id = companyId;
-      newPayment.company_name = DEMO_COMPANIES.find(c => c.id === companyId)?.name;
-    }
+    if (isOut) newPayment.driver_id = driverId;
+    else newPayment.company_id = companyId;
 
-    DEMO_PAYMENTS.unshift(newPayment);
-    setPayments([...DEMO_PAYMENTS].filter(p => {
-      if (p.driver_id) return DEMO_DRIVERS.some(d => d.id === p.driver_id);
-      if (p.company_id) return DEMO_COMPANIES.some(c => c.id === p.company_id);
-      return true;
-    }));
-    toast('Payment logged ✓');
-    closeModal();
+    const created = await createPayment(newPayment);
+    if (created) {
+      DEMO_PAYMENTS.unshift(created);
+      setPayments([...DEMO_PAYMENTS].filter(p => {
+        if (p.driver_id) return DEMO_DRIVERS.some(d => d.id === p.driver_id);
+        if (p.company_id) return DEMO_COMPANIES.some(c => c.id === p.company_id);
+        return true;
+      }));
+      toast('Payment logged ✓');
+      closeModal();
+    } else {
+      toast('Error logging payment', 'err');
+    }
   }
 
   function showLogPayment() {
