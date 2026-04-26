@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { use, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Chart, registerables } from 'chart.js';
-import { fetchCompany, deleteCompany, updateCompany, fetchActivity, fetchOrderDrivers, fetchInvoices, fetchPayments } from '@/lib/data';
+import { fetchCompany, deleteCompany, updateCompany, fetchActivity, fetchOrderDrivers, fetchInvoices, fetchPayments, uploadCompanyLogo } from '@/lib/data';
 import { fmt, fmtDate, sBadge } from '@/lib/helpers';
 import { useModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
@@ -80,10 +80,33 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
     openModal(`Edit company — ${co.name}`,
       <div>
         <div style={{ background: 'linear-gradient(135deg,#1a1a2e 0%,#16213e 100%)', borderRadius: '10px', padding: '24px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '18px' }}>
-          <div style={{ width: '64px', height: '64px', borderRadius: '12px', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 800, color: '#fff', border: '2px solid rgba(255,255,255,0.3)' }}>{co.code}</div>
-          <div><div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Edit company profile</div><div style={{ color: '#fff', fontSize: '18px', fontWeight: 600 }}>{co.name}</div></div>
+          {co.avatar_url ? <div style={{ width: '64px', height: '64px', borderRadius: '12px', backgroundImage: `url(${co.avatar_url})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '2px solid rgba(255,255,255,0.3)', flexShrink: 0 }} /> : <div style={{ width: '64px', height: '64px', borderRadius: '12px', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 800, color: '#fff', border: '2px solid rgba(255,255,255,0.3)', flexShrink: 0 }}>{co.code}</div>}
+          <div style={{ flex: 1 }}>
+            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Edit company profile</div>
+            <div style={{ color: '#fff', fontSize: '18px', fontWeight: 600 }}>{co.name}</div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Update logo</div>
+            <input form="edit-company-form" type="file" id="cf-pic" name="avatar" accept="image/*" style={{ fontSize: '12px', color: '#fff', width: '100%', cursor: 'pointer' }} />
+          </div>
         </div>
-        <form id="edit-company-form" onSubmit={async (e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); const updates: any = { code: fd.get('code'), name: fd.get('name'), address: fd.get('address'), contact_name: fd.get('contact_name'), contact_email: fd.get('contact_email'), contact_phone: fd.get('contact_phone'), licence_required: fd.get('licence_required'), rate_per_hour: Number(fd.get('rate_per_hour')) || 0, payment_terms_days: Number(fd.get('payment_terms_days')) || 14, status: fd.get('status'), notes: fd.get('notes') }; const updated = await updateCompany(co.id, updates); if (updated) { setCompany({ ...co, ...updated }); toast('Company updated ✓'); closeModal(); } else toast('Error updating company', 'err'); }}>
+        <form id="edit-company-form" onSubmit={async (e) => { 
+          e.preventDefault(); 
+          const fd = new FormData(e.currentTarget); 
+          const updates: any = { code: fd.get('code'), name: fd.get('name'), address: fd.get('address'), contact_name: fd.get('contact_name'), contact_email: fd.get('contact_email'), contact_phone: fd.get('contact_phone'), licence_required: fd.get('licence_required'), rate_per_hour: Number(fd.get('rate_per_hour')) || 0, payment_terms_days: Number(fd.get('payment_terms_days')) || 14, status: fd.get('status'), notes: fd.get('notes') }; 
+          
+          let newAvatarUrl = co.avatar_url;
+          const file = fd.get('avatar') as File;
+          if (file && file.size > 0) {
+            const url = await uploadCompanyLogo(file, co.id);
+            if (url) newAvatarUrl = url;
+          }
+          if (newAvatarUrl) updates.avatar_url = newAvatarUrl;
+
+          const updated = await updateCompany(co.id, updates); 
+          if (updated) { setCompany({ ...co, ...updated }); toast('Company updated ✓'); closeModal(); } 
+          else toast('Error updating company', 'err'); 
+        }}>
           <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', paddingBottom: '6px', borderBottom: '.5px solid var(--border)' }}>🏢 Company details</div>
           <div className="form-grid"><FormField label="Company code" id="cf-code" name="code" value={co.code} required /><FormField label="Full name" id="cf-name" name="name" value={co.name} required /></div>
           <FormField label="Address" id="cf-addr" name="address" value={co.address} />
@@ -114,7 +137,7 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
       </div>
       <div className="content">
         <div className="phero">
-          <div className="av av-xl sq-lg" style={{ background: co.avatar_color, color: co.avatar_text_color, fontSize: '13px', fontWeight: 800 }}>{co.code}</div>
+          {co.avatar_url ? <div className="av av-xl sq-lg" style={{ backgroundImage: `url(${co.avatar_url})`, backgroundSize: 'cover', backgroundPosition: 'center', border: 'none' }} /> : <div className="av av-xl sq-lg" style={{ background: co.avatar_color, color: co.avatar_text_color, fontSize: '13px', fontWeight: 800 }}>{co.code}</div>}
           <div className="phero-info">
             <div className="phero-name">{co.name}</div>
             <div className="phero-meta">{co.contact_name} · {co.contact_email} · {co.contact_phone}</div>

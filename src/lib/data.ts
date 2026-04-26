@@ -43,6 +43,15 @@ export async function uploadAvatar(file: File, driverId: number): Promise<string
   return publicUrlData.publicUrl;
 }
 
+export async function uploadCompanyLogo(file: File, companyId: number): Promise<string | null> {
+  const ext = file.name.split('.').pop();
+  const filePath = `avatars/company_${companyId}_${Date.now()}.${ext}`;
+  const { data, error } = await sb().storage.from('documents').upload(filePath, file);
+  if (error) { console.error('Logo upload error:', error); return null; }
+  const { data: publicUrlData } = sb().storage.from('documents').getPublicUrl(filePath);
+  return publicUrlData.publicUrl;
+}
+
 export async function createDriver(driver: Partial<Driver>): Promise<{ data: Driver | null, error: any }> {
   const { data, error } = await sb().from('drivers').insert(driver as never).select().single();
   if (error) { console.error('createDriver error:', error); return { data: null, error }; }

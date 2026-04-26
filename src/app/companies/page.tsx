@@ -38,6 +38,15 @@ export default function CompaniesPage() {
     
     const { data: created, error } = await createCompany(newCompany);
     if (created) {
+      const file = fd.get('avatar') as File;
+      if (file && file.size > 0) {
+        const { uploadCompanyLogo, updateCompany } = await import('@/lib/data');
+        const url = await uploadCompanyLogo(file, created.id);
+        if (url) {
+          created.avatar_url = url;
+          await updateCompany(created.id, { avatar_url: url });
+        }
+      }
       setCompanies(prev => [created, ...prev]);
       toast('Company added successfully ✓');
       closeModal();
@@ -51,7 +60,14 @@ export default function CompaniesPage() {
       <form id="add-company-form" onSubmit={handleAddCompany}>
         <div style={{ background: 'linear-gradient(135deg,#1a1a2e 0%,#16213e 100%)', borderRadius: '10px', padding: '24px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '18px' }}>
           <div style={{ width: '64px', height: '64px', borderRadius: '12px', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 800, color: '#fff', border: '2px solid rgba(255,255,255,0.3)', flexShrink: 0 }}>CO</div>
-          <div><div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>New company profile</div><div style={{ color: '#fff', fontSize: '18px', fontWeight: 600 }}>Fill in details below</div></div>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>New company profile</div>
+            <div style={{ color: '#fff', fontSize: '18px', fontWeight: 600 }}>Fill in details below</div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Company Logo</div>
+            <input type="file" id="cf-pic" name="avatar" accept="image/*" style={{ fontSize: '12px', color: '#fff', width: '100%', cursor: 'pointer' }} />
+          </div>
         </div>
         <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', paddingBottom: '6px', borderBottom: '.5px solid var(--border)' }}>🏢 Company details</div>
         <div className="form-grid"><FormField label="Company code (e.g. DHL)" id="cf-code" name="code" required /><FormField label="Full company name" id="cf-name" name="name" required /></div>
@@ -79,7 +95,11 @@ export default function CompaniesPage() {
           {companies.map(c => (
             <Link href={`/companies/${c.id}`} key={c.id} className="ccard">
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                <div className="av av-m sq" style={{ background: c.avatar_color, color: c.avatar_text_color, fontSize: '10px', fontWeight: 800 }}>{c.code}</div>
+                {c.avatar_url ? (
+                  <div className="av av-m sq" style={{ backgroundImage: `url(${c.avatar_url})`, backgroundSize: 'cover', backgroundPosition: 'center', border: 'none' }} />
+                ) : (
+                  <div className="av av-m sq" style={{ background: c.avatar_color, color: c.avatar_text_color, fontSize: '10px', fontWeight: 800 }}>{c.code}</div>
+                )}
                 <div><div style={{ fontWeight: 600, fontSize: '14px' }}>{c.name}</div><div style={{ fontSize: '11px', color: 'var(--text3)' }}>{c.driver_count} drivers</div></div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px', marginBottom: '12px' }}>

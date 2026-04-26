@@ -49,6 +49,7 @@ export interface Company {
   notes?: string;
   avatar_color: string;
   avatar_text_color: string;
+  avatar_url?: string;
   created_at: string;
   // Computed
   total_orders?: number;
