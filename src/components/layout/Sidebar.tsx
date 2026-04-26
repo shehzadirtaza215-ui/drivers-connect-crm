@@ -2,28 +2,42 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-
-const navItems = [
-  { section: 'Main', items: [
-    { href: '/', label: 'Dashboard', icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="8" y="1" width="5" height="5" rx="1"/><rect x="1" y="8" width="5" height="5" rx="1"/><rect x="8" y="8" width="5" height="5" rx="1"/></svg> },
-  ]},
-  { section: 'People', items: [
-    { href: '/drivers', label: 'Drivers', badge: '24', icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="7" cy="4.5" r="2.5"/><path d="M1.5 13c0-3 2.5-5.5 5.5-5.5s5.5 2.5 5.5 5.5"/></svg> },
-    { href: '/companies', label: 'Companies', badge: '11', icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1.5" y="5" width="11" height="8" rx="1"/><path d="M4.5 5V3a1 1 0 011-1h3a1 1 0 011 1v2"/></svg> },
-  ]},
-  { section: 'Operations', items: [
-    { href: '/orders', label: 'Orders', badge: '7', icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1.5" y="1.5" width="11" height="11" rx="1"/><line x1="4" y1="5" x2="10" y2="5"/><line x1="4" y1="7.5" x2="8" y2="7.5"/><line x1="4" y1="10" x2="7" y2="10"/></svg> },
-    { href: '/shifts', label: 'Shifts', icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="7" cy="7" r="5.5"/><polyline points="7,3.5 7,7 9.5,8.5"/></svg> },
-  ]},
-  { section: 'Finance', items: [
-    { href: '/invoices', label: 'Invoices', icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2.5" y="1" width="9" height="12" rx="1"/><line x1="5" y1="4.5" x2="9" y2="4.5"/><line x1="5" y1="7" x2="9" y2="7"/><line x1="5" y1="9.5" x2="7" y2="9.5"/></svg> },
-    { href: '/payments', label: 'Payments', icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1" y="3.5" width="12" height="8" rx="1"/><line x1="1" y1="6.5" x2="13" y2="6.5"/><circle cx="4" cy="9.5" r="1" fill="currentColor"/></svg> },
-    { href: '/compliance', label: 'Compliance', icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M7 1L1.5 4v4c0 3.3 2.5 6 5.5 6.5C13 13.5 12.5 8 12.5 8V4L7 1z"/><polyline points="4.5,7 6.5,9 10,5.5"/></svg> },
-  ]},
-];
+import { useState, useEffect } from 'react';
+import { DEMO_DRIVERS, DEMO_COMPANIES, DEMO_ORDERS } from '@/lib/demo-data';
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [counts, setCounts] = useState({ drivers: 0, companies: 0, orders: 0 });
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      setCounts({
+        drivers: DEMO_DRIVERS.length,
+        companies: DEMO_COMPANIES.length,
+        orders: DEMO_ORDERS.filter(o => o.status === 'draft' || o.status === 'active').length
+      });
+    }, 1000);
+    return () => clearInterval(iv);
+  }, []);
+
+  const navItems = [
+    { section: 'Main', items: [
+      { href: '/', label: 'Dashboard', icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="8" y="1" width="5" height="5" rx="1"/><rect x="1" y="8" width="5" height="5" rx="1"/><rect x="8" y="8" width="5" height="5" rx="1"/></svg> },
+    ]},
+    { section: 'People', items: [
+      { href: '/drivers', label: 'Drivers', badge: counts.drivers > 0 ? counts.drivers : null, icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="7" cy="4.5" r="2.5"/><path d="M1.5 13c0-3 2.5-5.5 5.5-5.5s5.5 2.5 5.5 5.5"/></svg> },
+      { href: '/companies', label: 'Companies', badge: counts.companies > 0 ? counts.companies : null, icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1.5" y="5" width="11" height="8" rx="1"/><path d="M4.5 5V3a1 1 0 011-1h3a1 1 0 011 1v2"/></svg> },
+    ]},
+    { section: 'Operations', items: [
+      { href: '/orders', label: 'Orders', badge: counts.orders > 0 ? counts.orders : null, icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1.5" y="1.5" width="11" height="11" rx="1"/><line x1="4" y1="5" x2="10" y2="5"/><line x1="4" y1="7.5" x2="8" y2="7.5"/><line x1="4" y1="10" x2="7" y2="10"/></svg> },
+      { href: '/shifts', label: 'Shifts', icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="7" cy="7" r="5.5"/><polyline points="7,3.5 7,7 9.5,8.5"/></svg> },
+    ]},
+    { section: 'Finance', items: [
+      { href: '/invoices', label: 'Invoices', icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2.5" y="1" width="9" height="12" rx="1"/><line x1="5" y1="4.5" x2="9" y2="4.5"/><line x1="5" y1="7" x2="9" y2="7"/><line x1="5" y1="9.5" x2="7" y2="9.5"/></svg> },
+      { href: '/payments', label: 'Payments', icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1" y="3.5" width="12" height="8" rx="1"/><line x1="1" y1="6.5" x2="13" y2="6.5"/><circle cx="4" cy="9.5" r="1" fill="currentColor"/></svg> },
+      { href: '/compliance', label: 'Compliance', icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M7 1L1.5 4v4c0 3.3 2.5 6 5.5 6.5C13 13.5 12.5 8 12.5 8V4L7 1z"/><polyline points="4.5,7 6.5,9 10,5.5"/></svg> },
+    ]},
+  ];
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
