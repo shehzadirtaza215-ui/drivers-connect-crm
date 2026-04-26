@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { fetchDrivers, createDriver } from '@/lib/data';
+import { fetchDrivers, createDriver, uploadAvatar, updateDriver } from '@/lib/data';
 import { fmt, fmtDate, isExp, sBadge } from '@/lib/helpers';
 import { useModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
@@ -40,6 +40,7 @@ export default function DriversPage() {
       tacho_card: fd.get('tacho_card') as string,
       rtw_type: fd.get('rtw_type') as string,
       rtw_expiry: fd.get('rtw_expiry') as string || null,
+      share_code: fd.get('share_code') as string || null,
       utr_number: fd.get('utr_number') as string,
       ni_number: fd.get('ni_number') as string,
       tax_code: fd.get('tax_code') as string,
@@ -50,6 +51,14 @@ export default function DriversPage() {
     
     const created = await createDriver(newDriver);
     if (created) {
+      const file = fd.get('avatar') as File;
+      if (file && file.size > 0) {
+        const url = await uploadAvatar(file, created.id);
+        if (url) {
+          created.avatar_url = url;
+          await updateDriver(created.id, { avatar_url: url });
+        }
+      }
       setDrivers(prev => [created, ...prev]);
       toast('Driver added successfully ✓');
       closeModal();
@@ -69,7 +78,7 @@ export default function DriversPage() {
         <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', paddingBottom: '6px', borderBottom: '.5px solid var(--border)' }}>👤 Personal information</div>
         <div style={{ marginBottom: '16px' }}>
           <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '6px', color: 'var(--text2)' }}>Profile picture</label>
-          <input type="file" id="df-pic" accept="image/*" style={{ fontSize: '13px', width: '100%' }} />
+          <input type="file" id="df-pic" name="avatar" accept="image/*" style={{ fontSize: '13px', width: '100%' }} />
         </div>
         <div className="form-grid">
           <FormField label="First name" id="df-fn" name="first_name" required />
@@ -92,6 +101,7 @@ export default function DriversPage() {
         <div className="form-grid">
           <FormField label="RTW type" id="df-rtw" name="rtw_type" options={[{ v: 'passport', l: 'UK/EU Passport' }, { v: 'visa', l: 'Visa' }, { v: 'share_code', l: 'Share code' }]} />
           <FormField label="RTW expiry (if visa)" id="df-rtwx" name="rtw_expiry" type="date" />
+          <FormField label="Share code (if applicable)" id="df-sc" name="share_code" />
         </div>
         <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', margin: '16px 0 10px', paddingBottom: '6px', borderBottom: '.5px solid var(--border)' }}>💷 Payroll &amp; tax</div>
         <div className="form-grid">
