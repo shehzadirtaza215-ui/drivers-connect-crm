@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { use, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Chart, registerables } from 'chart.js';
-import { fetchDriver, deleteDriver, updateDriver, fetchDocuments, uploadDocument, fetchActivity, fetchOrderDrivers, fetchPayments } from '@/lib/data';
+import { fetchDriver, deleteDriver, updateDriver, fetchDocuments, uploadDocument, fetchActivity, fetchOrderDrivers, fetchPayments, uploadAvatar } from '@/lib/data';
 import { fmt, fmtDate, isExp } from '@/lib/helpers';
 import { useModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
@@ -70,7 +70,15 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
       <div>
         <div style={{ background: 'linear-gradient(135deg,#E8460A 0%,#c93a08 100%)', borderRadius: '10px', padding: '24px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '18px' }}>
           {driver.avatar_url ? <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundImage: `url(${driver.avatar_url})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '3px solid rgba(255,255,255,0.5)', flexShrink: 0 }} /> : <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', fontWeight: 700, color: '#fff', border: '3px solid rgba(255,255,255,0.5)', flexShrink: 0 }}>{driver.initials}</div>}
-          <div><div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Edit driver profile</div><div style={{ color: '#fff', fontSize: '18px', fontWeight: 600 }}>{driver.first_name} {driver.last_name}</div><div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', marginTop: '2px' }}>{driver.licence_category} · {driver.employment_type}</div></div>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Edit driver profile</div>
+            <div style={{ color: '#fff', fontSize: '18px', fontWeight: 600 }}>{driver.first_name} {driver.last_name}</div>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', marginTop: '2px' }}>{driver.licence_category} · {driver.employment_type}</div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Update picture</div>
+            <input form="edit-driver-form" type="file" id="df-pic" name="avatar" accept="image/*" style={{ fontSize: '12px', color: '#fff', width: '100%', cursor: 'pointer' }} />
+          </div>
         </div>
         <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', paddingBottom: '6px', borderBottom: '.5px solid var(--border)' }}>👤 Personal information</div>
         <form id="edit-driver-form" onSubmit={async (e) => {
@@ -86,6 +94,15 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
             rtw_type: fd.get('rtw_type'), rtw_expiry: fd.get('rtw_expiry') || null, share_code: fd.get('share_code'),
             utr_number: fd.get('utr_number'), ni_number: fd.get('ni_number'), tax_code: fd.get('tax_code'), status: fd.get('status')
           };
+          
+          let newAvatarUrl = driver.avatar_url;
+          const file = fd.get('avatar') as File;
+          if (file && file.size > 0) {
+            const url = await uploadAvatar(file, driver.id);
+            if (url) newAvatarUrl = url;
+          }
+          if (newAvatarUrl) updates.avatar_url = newAvatarUrl;
+
           const updated = await updateDriver(driver.id, updates);
           if (updated) { setDriver({ ...driver, ...updated }); toast('Driver updated ✓'); closeModal(); }
           else toast('Error updating driver', 'err');
