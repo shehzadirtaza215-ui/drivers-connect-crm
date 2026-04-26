@@ -5,7 +5,7 @@ import { use, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Chart, registerables } from 'chart.js';
 import { fetchDriver, deleteDriver } from '@/lib/data';
-import { DEMO_ACTIVITY } from '@/lib/demo-data';
+import { DEMO_ACTIVITY, DEMO_ORDERS } from '@/lib/demo-data';
 import { fmt, fmtDate, isExp } from '@/lib/helpers';
 import { useModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
@@ -41,6 +41,10 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
   }, [activeTab]);
 
   if (!driver) return <div style={{ padding: '20px' }}>Loading driver...</div>;
+
+  const driverOrders = DEMO_ORDERS.filter((o: any) => o.driver_names && o.driver_names.includes(driver.first_name)).map((o: any) => ({
+    ref: o.order_ref, company: o.company_name || 'Company', coId: o.company_id, date: o.start_datetime ? fmtDate(o.start_datetime) : '-', route: o.start_address ? `${o.start_address} → ${o.end_address}` : '-', hours: o.hours_done ? `${o.hours_done}h` : '-', pay: o.hours_done && o.company_rate ? `£${(o.hours_done * o.company_rate * 0.75).toFixed(2)}` : '-', billed: o.hours_done && o.company_rate ? `£${(o.hours_done * o.company_rate).toFixed(2)}` : '-', margin: o.hours_done && o.company_rate ? `£${(o.hours_done * o.company_rate * 0.25).toFixed(2)}` : '-', status: o.status
+  }));
 
   function showEditDriver() {
     openModal(`Edit driver — ${driver.first_name} ${driver.last_name}`,

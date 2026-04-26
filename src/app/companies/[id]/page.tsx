@@ -5,7 +5,7 @@ import { use, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Chart, registerables } from 'chart.js';
 import { fetchCompany, deleteCompany } from '@/lib/data';
-import { DEMO_DRIVERS, DEMO_ACTIVITY } from '@/lib/demo-data';
+import { DEMO_DRIVERS, DEMO_ACTIVITY, DEMO_ORDERS } from '@/lib/demo-data';
 import { fmt, fmtDate, sBadge } from '@/lib/helpers';
 import { useModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
@@ -28,11 +28,6 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
     fetchCompany(Number(id)).then(setCompany);
   }, [id]);
 
-  const companyOrders = [
-    { ref: 'ORD-041', driver: 'James Mitchell', dId: 1, date: '17 Apr 2026', hours: '9.5h', cost: '£142.50', billed: '£190', margin: '£47.50', status: 'completed' },
-    { ref: 'ORD-038', driver: 'James Mitchell', dId: 1, date: '14 Apr 2026', hours: '11h', cost: '£165', billed: '£220', margin: '£55', status: 'completed' },
-    { ref: 'ORD-035', driver: 'Ahmed Rashid', dId: 4, date: '10 Apr 2026', hours: '8h', cost: '£120', billed: '£160', margin: '£40', status: 'completed' },
-  ];
 
   const companyDrivers = DEMO_DRIVERS.filter(d => d.id <= 3);
 
@@ -49,6 +44,10 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
   }, [activeTab]);
 
   if (!co) return <div style={{ padding: '20px' }}>Loading company...</div>;
+
+  const companyOrders = DEMO_ORDERS.filter((o: any) => o.company_id === co.id).map((o: any) => ({
+    ref: o.order_ref, driver: o.driver_names || 'Unassigned', dId: 1, date: o.start_datetime ? fmtDate(o.start_datetime) : '-', hours: o.hours_done ? `${o.hours_done}h` : '-', cost: o.hours_done && o.company_rate ? `£${(o.hours_done * o.company_rate * 0.75).toFixed(2)}` : '-', billed: o.hours_done && o.company_rate ? `£${(o.hours_done * o.company_rate).toFixed(2)}` : '-', margin: o.hours_done && o.company_rate ? `£${(o.hours_done * o.company_rate * 0.25).toFixed(2)}` : '-', status: o.status
+  }));
 
   function showEditCompany() {
     openModal(`Edit company — ${co.name}`,
