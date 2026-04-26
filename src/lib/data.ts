@@ -43,11 +43,11 @@ export async function uploadAvatar(file: File, driverId: number): Promise<string
   return publicUrlData.publicUrl;
 }
 
-export async function createDriver(driver: Partial<Driver>): Promise<Driver | null> {
+export async function createDriver(driver: Partial<Driver>): Promise<{ data: Driver | null, error: any }> {
   const { data, error } = await sb().from('drivers').insert(driver as never).select().single();
-  if (error) { console.error('createDriver error:', error); return null; }
-  if (data) await logActivity({ entity_type: 'driver', entity_id: (data as any).id, action: 'Driver created', new_value: `${(data as any).first_name} ${(data as any).last_name}` });
-  return data;
+  if (error) { console.error('createDriver error:', error); return { data: null, error }; }
+  if (data) await logActivity({ entity_type: 'driver', entity_id: (data as any).id, action: 'Driver added', new_value: `${driver.first_name} ${driver.last_name}` });
+  return { data, error: null };
 }
 
 export async function updateDriver(id: number, updates: Partial<Driver>): Promise<Driver | null> {

@@ -49,7 +49,7 @@ export default function DriversPage() {
       avatar_text_color: '#185fa5',
     };
     
-    const created = await createDriver(newDriver);
+    const { data: created, error } = await createDriver(newDriver);
     if (created) {
       const file = fd.get('avatar') as File;
       if (file && file.size > 0) {
@@ -63,7 +63,7 @@ export default function DriversPage() {
       toast('Driver added successfully ✓');
       closeModal();
     } else {
-      toast('Error adding driver', 'err');
+      toast(`Error: ${error?.message || 'Failed to add driver'}`, 'err');
     }
   }
 
