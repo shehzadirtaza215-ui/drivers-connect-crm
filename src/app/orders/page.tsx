@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { fetchOrders, fetchDrivers, fetchCompanies, createOrder, updateOrder, createOrderDriver, updateOrderDriverHours } from '@/lib/data';
+import { fetchOrders, fetchDrivers, fetchCompanies, createOrder, updateOrder, createOrderDriver, updateOrderDriverHours, deleteOrder } from '@/lib/data';
 import { fmt, fmtDate, sBadge } from '@/lib/helpers';
 import { useModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
@@ -74,6 +74,18 @@ export default function OrdersPage() {
     await refreshOrders();
     toast('Order completed ✓');
     closeModal();
+  }
+
+  async function handleDeleteOrder(orderId: number) {
+    if (window.confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
+      const deleted = await deleteOrder(orderId);
+      if (deleted) {
+        await refreshOrders();
+        toast('Order deleted ✓');
+      } else {
+        toast('Error deleting order', 'err');
+      }
+    }
   }
 
   function showNewOrder() {
@@ -156,6 +168,7 @@ export default function OrdersPage() {
                 <span className={`badge badge-${sBadge(o.status)}`}>{o.status}</span>
                 {o.status === 'draft' && <button className="btn btn-primary btn-sm" onClick={() => showAssignDriver(o.id, o.licence_required || '')}>Assign driver</button>}
                 {o.status === 'active' && <button className="btn btn-primary btn-sm" onClick={() => showCompleteOrder(o.id)}>Mark complete</button>}
+                <button className="btn btn-sm" style={{ color: 'var(--red)', borderColor: 'rgba(153, 31, 31, 0.3)', padding: '4px 8px' }} onClick={() => handleDeleteOrder(o.id)}>Delete</button>
               </div>
             </div>
             <div className="stat-strip">
