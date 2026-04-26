@@ -26,6 +26,9 @@ export default function PaymentsPage() {
   }, []);
 
   const totalDue = pendingDrivers.reduce((s, d) => s + (d.pending_pay || 0), 0);
+  const totalReceived = payments.filter(p => p.direction === 'in').reduce((s, p) => s + (p.amount || 0), 0);
+  const totalPaidOut = payments.filter(p => p.direction === 'out').reduce((s, p) => s + (p.amount || 0), 0);
+  const netMargin = totalReceived - totalPaidOut;
 
   async function handleLogPayment(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -100,47 +103,50 @@ export default function PaymentsPage() {
       <div className="topbar"><div className="page-title">Payments</div><div className="tbar-right"><button className="btn btn-primary btn-sm" onClick={showLogPayment}>+ Log payment</button></div></div>
       <div className="content">
         <div className="g4" style={{ marginBottom: '16px' }}>
-          <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Received (Apr)</div><div className="mcard-val vg">£2,160</div></div>
-          <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Paid to drivers (Apr)</div><div className="mcard-val va">£1,820</div></div>
-          <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Payroll due 25 Apr</div><div className="mcard-val vr">£{fmt(totalDue)}</div></div>
-          <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Net margin (Apr)</div><div className="mcard-val vg">£340</div></div>
+          <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Received (total)</div><div className="mcard-val vg">£{fmt(totalReceived)}</div></div>
+          <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Paid to drivers</div><div className="mcard-val va">£{fmt(totalPaidOut)}</div></div>
+          <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Payroll due</div><div className="mcard-val vr">£{fmt(totalDue)}</div></div>
+          <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Net margin</div><div className="mcard-val vg">£{fmt(netMargin)}</div></div>
         </div>
 
-        <div className="card" style={{ marginBottom: '14px' }}>
-          <div className="ch"><span className="card-title">Driver payroll — pending · due 25 Apr</span></div>
-          {pendingDrivers.map(d => (
-            <div className="pay-expandable" key={d.id}>
-              <div className="prow clickable" onClick={() => setExpanded(expanded === d.id ? null : d.id)}>
-                <span className="pd pd-out">OUT</span>
-                <div className="lr-info">
-                  <div className="lr-name"><Link href={`/drivers/${d.id}`} className="lnk" onClick={e => e.stopPropagation()}>{d.first_name} {d.last_name}</Link></div>
-                  <div className="lr-meta">{d.total_hours ? Math.round(d.total_hours / 8) + 'h' : ''} · {d.employment_type}</div>
-                </div>
-                <div className="lr-amt va">£{fmt(d.pending_pay)}</div>
-                <span className="badge badge-amber" style={{ marginLeft: '8px' }}>Due</span>
-                <span style={{ marginLeft: '8px', color: 'var(--text3)', fontSize: '12px' }}>{expanded === d.id ? '▲' : '▼'}</span>
-              </div>
-              {expanded === d.id && (
-                <div className="pay-expand-body">
-                  <div style={{ fontSize: '12px', color: 'var(--text3)' }}>Upload payment proof and mark as paid once transferred.</div>
-                  <label className="dc" style={{ textAlign: 'center', padding: '14px', cursor: 'pointer', marginTop: '6px', display: 'block' }}>
-                    <input type="file" style={{ display: 'none' }} onChange={(e) => e.target.files?.length && toast('Receipt selected: ' + e.target.files[0].name)} />
-                    <div style={{ fontSize: '12px', color: 'var(--text3)' }}>📎 Upload bank receipt / proof of payment</div>
-                  </label>
-                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
-                    <button className="btn btn-sm" onClick={() => setExpanded(null)}>Cancel</button>
-                    <button className="btn btn-primary btn-sm" onClick={() => markPaid(d.id, d.first_name + ' ' + d.last_name)}>Mark paid &amp; save proof</button>
+        {pendingDrivers.length > 0 && (
+          <div className="card" style={{ marginBottom: '14px' }}>
+            <div className="ch"><span className="card-title">Driver payroll — pending</span></div>
+            {pendingDrivers.map(d => (
+              <div className="pay-expandable" key={d.id}>
+                <div className="prow clickable" onClick={() => setExpanded(expanded === d.id ? null : d.id)}>
+                  <span className="pd pd-out">OUT</span>
+                  <div className="lr-info">
+                    <div className="lr-name"><Link href={`/drivers/${d.id}`} className="lnk" onClick={e => e.stopPropagation()}>{d.first_name} {d.last_name}</Link></div>
+                    <div className="lr-meta">{d.total_shifts || 0} shifts · {d.employment_type}</div>
                   </div>
+                  <div className="lr-amt va">£{fmt(d.pending_pay)}</div>
+                  <span className="badge badge-amber" style={{ marginLeft: '8px' }}>Due</span>
+                  <span style={{ marginLeft: '8px', color: 'var(--text3)', fontSize: '12px' }}>{expanded === d.id ? '▲' : '▼'}</span>
                 </div>
-              )}
-            </div>
-          ))}
-          <hr className="sep-line" />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '14px' }}><span>Total due</span><span style={{ color: 'var(--red)' }}>£{fmt(totalDue)}</span></div>
-        </div>
+                {expanded === d.id && (
+                  <div className="pay-expand-body">
+                    <div style={{ fontSize: '12px', color: 'var(--text3)' }}>Upload payment proof and mark as paid once transferred.</div>
+                    <label className="dc" style={{ textAlign: 'center', padding: '14px', cursor: 'pointer', marginTop: '6px', display: 'block' }}>
+                      <input type="file" style={{ display: 'none' }} onChange={(e) => e.target.files?.length && toast('Receipt selected: ' + e.target.files[0].name)} />
+                      <div style={{ fontSize: '12px', color: 'var(--text3)' }}>📎 Upload bank receipt / proof of payment</div>
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                      <button className="btn btn-sm" onClick={() => setExpanded(null)}>Cancel</button>
+                      <button className="btn btn-primary btn-sm" onClick={() => markPaid(d.id, d.first_name + ' ' + d.last_name)}>Mark paid &amp; save proof</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            <hr className="sep-line" />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '14px' }}><span>Total due</span><span style={{ color: 'var(--red)' }}>£{fmt(totalDue)}</span></div>
+          </div>
+        )}
 
         <div className="card">
           <div className="ch"><span className="card-title">All transactions</span></div>
+          {payments.length === 0 && <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text3)', fontSize: '13px' }}>No payments recorded yet</div>}
           {payments.map(p => (
             <div className="prow" key={p.id} style={{ borderBottom: '.5px solid var(--border)' }}>
               <span className={`pd ${p.direction === 'in' ? 'pd-in' : 'pd-out'}`}>{p.direction === 'in' ? 'IN' : 'OUT'}</span>
