@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { use, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Chart, registerables } from 'chart.js';
-import { fetchDriver, deleteDriver } from '@/lib/data';
-import { DEMO_ACTIVITY, DEMO_ORDERS } from '@/lib/demo-data';
+import { fetchDriver, deleteDriver, updateDriver, fetchDocuments, uploadDocument, fetchActivity } from '@/lib/data';
+import { DEMO_ORDERS, DEMO_PAYMENTS } from '@/lib/demo-data';
 import { fmt, fmtDate, isExp } from '@/lib/helpers';
 import { useModal } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
@@ -18,6 +18,8 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
   const router = useRouter();
   const [driver, setDriver] = useState<any>(null);
   const [activeTab, setActiveTab] = useState(0);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [activityLog, setActivityLog] = useState<any[]>([]);
   const { openModal, closeModal } = useModal();
   const { toast } = useToast();
   const chartRef = useRef<HTMLCanvasElement>(null);
@@ -26,25 +28,36 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
 
   useEffect(() => {
     fetchDriver(Number(id)).then(setDriver);
+    fetchDocuments('driver', Number(id)).then(setDocuments);
+    fetchActivity('driver', Number(id)).then(setActivityLog);
   }, [id]);
 
+  // Compute driver orders from real data
+  const driverOrders = driver ? DEMO_ORDERS.filter((o: any) => o.driver_names && o.driver_names.includes(driver.first_name)).map((o: any) => ({
+    ref: o.order_ref, company: o.company_name || 'Company', coId: o.company_id, date: o.start_datetime ? fmtDate(o.start_datetime) : '-', route: o.start_address ? `${o.start_address} → ${o.end_address || ''}` : '-', hours: o.hours_done ? `${o.hours_done}h` : '-', pay: o.hours_done && o.company_rate ? `£${(o.hours_done * o.company_rate * 0.75).toFixed(2)}` : '-', billed: o.hours_done && o.company_rate ? `£${(o.hours_done * o.company_rate).toFixed(2)}` : '-', margin: o.hours_done && o.company_rate ? `£${(o.hours_done * o.company_rate * 0.25).toFixed(2)}` : '-', status: o.status
+  })) : [];
+
+  // Compute driver payments from real data
+  const driverPayments = driver ? DEMO_PAYMENTS.filter((p: any) => p.driver_id === driver.id) : [];
+
   useEffect(() => {
-    if (activeTab === 2 && chartRef.current && !chartInst.current) {
+    if (activeTab === 2 && chartRef.current && !chartInst.current && driverOrders.length > 0) {
+      const labels = driverOrders.map(o => o.date).reverse();
+      const data = driverOrders.map(o => parseFloat(o.pay.replace('£', '')) || 0).reverse();
       chartInst.current = new Chart(chartRef.current, {
-        type: 'bar', data: { labels: ['Feb', 'wk1M', 'wk2M', 'wk3M', 'wk4M', 'wk1A', 'wk2A', 'wk3A'], datasets: [
-          { label: 'Paid', data: [510, 480, 540, 600, 570, 630, 540, 0], backgroundColor: '#2d7a3a', borderRadius: 4, borderSkipped: false },
-          { label: 'Pending', data: [0, 0, 0, 0, 0, 0, 0, 630], backgroundColor: '#E8460A', borderRadius: 4, borderSkipped: false }
+        type: 'bar', data: { labels, datasets: [
+          { label: 'Pay', data, backgroundColor: '#2d7a3a', borderRadius: 4, borderSkipped: false }
         ] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { stacked: true, grid: { color: 'rgba(0,0,0,.05)' }, ticks: { color: 'rgba(0,0,0,.38)', font: { size: 9 } }, border: { display: false } }, y: { stacked: true, grid: { color: 'rgba(0,0,0,.05)' }, ticks: { color: 'rgba(0,0,0,.38)', font: { size: 10 }, callback: (v: string | number) => '£' + v }, border: { display: false } } } } as never
       });
     }
     return () => { if (activeTab !== 2) { chartInst.current?.destroy(); chartInst.current = null; } };
-  }, [activeTab]);
+  }, [activeTab, driverOrders.length]);
 
   if (!driver) return <div style={{ padding: '20px' }}>Loading driver...</div>;
 
-  const driverOrders = DEMO_ORDERS.filter((o: any) => o.driver_names && o.driver_names.includes(driver.first_name)).map((o: any) => ({
-    ref: o.order_ref, company: o.company_name || 'Company', coId: o.company_id, date: o.start_datetime ? fmtDate(o.start_datetime) : '-', route: o.start_address ? `${o.start_address} → ${o.end_address}` : '-', hours: o.hours_done ? `${o.hours_done}h` : '-', pay: o.hours_done && o.company_rate ? `£${(o.hours_done * o.company_rate * 0.75).toFixed(2)}` : '-', billed: o.hours_done && o.company_rate ? `£${(o.hours_done * o.company_rate).toFixed(2)}` : '-', margin: o.hours_done && o.company_rate ? `£${(o.hours_done * o.company_rate * 0.25).toFixed(2)}` : '-', status: o.status
-  }));
+  const totalEarned = driverPayments.filter(p => p.direction === 'out').reduce((s: number, p: any) => s + (p.amount || 0), 0);
+  const totalShifts = driverOrders.length;
+  const totalHours = driverOrders.reduce((s, o) => s + (parseFloat(o.hours) || 0), 0);
 
   function showEditDriver() {
     openModal(`Edit driver — ${driver.first_name} ${driver.last_name}`,
@@ -58,25 +71,42 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
           <div><div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Edit driver profile</div><div style={{ color: '#fff', fontSize: '18px', fontWeight: 600 }}>{driver.first_name} {driver.last_name}</div><div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', marginTop: '2px' }}>{driver.licence_category} · {driver.employment_type}</div></div>
         </div>
         <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', paddingBottom: '6px', borderBottom: '.5px solid var(--border)' }}>👤 Personal information</div>
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '6px', color: 'var(--text2)' }}>Profile picture</label>
-          <input type="file" id="df-pic" accept="image/*" style={{ fontSize: '13px', width: '100%' }} />
-        </div>
-        <div className="form-grid">
-          <FormField label="First name" id="df-fn" value={driver.first_name} required />
-          <FormField label="Last name" id="df-ln" value={driver.last_name} required />
-          <FormField label="Phone" id="df-ph" type="tel" value={driver.phone} />
-          <FormField label="Email" id="df-em" type="email" value={driver.email} />
-        </div>
-        <FormField label="Home address" id="df-addr" value={driver.address} />
-        <div className="form-grid"><FormField label="Emergency contact" id="df-ec" value={driver.emergency_contact} /><FormField label="Emergency phone" id="df-ep" type="tel" value={driver.emergency_phone} /></div>
-        <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', margin: '16px 0 10px', paddingBottom: '6px', borderBottom: '.5px solid var(--border)' }}>🚛 Licence &amp; compliance</div>
-        <div className="form-grid">
-          <FormField label="Licence category" id="df-lc" value={driver.licence_category} options={['Class 1', 'Class 2', '7.5T', 'Van', 'Car']} required />
-          <FormField label="Employment type" id="df-et" value={driver.employment_type?.toLowerCase().replace(' ', '-')} options={[{ v: 'self-employed', l: 'Self-employed' }, { v: 'paye', l: 'PAYE' }]} required />
-          <FormField label="CPC expiry date" id="df-cpx" type="date" value={driver.cpc_expiry?.slice(0, 10)} />
-          <FormField label="Status" id="df-status" value={driver.status} options={[{ v: 'available', l: 'Available' }, { v: 'active', l: 'Active' }, { v: 'suspended', l: 'Suspended' }]} />
-        </div>
+        <form id="edit-driver-form" onSubmit={async (e) => {
+          e.preventDefault();
+          const fd = new FormData(e.currentTarget);
+          const updates: any = {
+            first_name: fd.get('first_name') as string,
+            last_name: fd.get('last_name') as string,
+            phone: fd.get('phone') as string,
+            email: fd.get('email') as string,
+            address: fd.get('address') as string,
+            emergency_contact: fd.get('emergency_contact') as string,
+            emergency_phone: fd.get('emergency_phone') as string,
+            licence_category: fd.get('licence_category') as string,
+            employment_type: fd.get('employment_type') as string,
+            cpc_expiry: fd.get('cpc_expiry') as string || null,
+            status: fd.get('status') as string,
+          };
+          const updated = await updateDriver(driver.id, updates);
+          if (updated) { setDriver(updated); toast('Driver updated ✓'); closeModal(); }
+          else toast('Error updating driver', 'err');
+        }}>
+          <div className="form-grid">
+            <FormField label="First name" id="df-fn" name="first_name" value={driver.first_name} required />
+            <FormField label="Last name" id="df-ln" name="last_name" value={driver.last_name} required />
+            <FormField label="Phone" id="df-ph" name="phone" type="tel" value={driver.phone} />
+            <FormField label="Email" id="df-em" name="email" type="email" value={driver.email} />
+          </div>
+          <FormField label="Home address" id="df-addr" name="address" value={driver.address} />
+          <div className="form-grid"><FormField label="Emergency contact" id="df-ec" name="emergency_contact" value={driver.emergency_contact} /><FormField label="Emergency phone" id="df-ep" name="emergency_phone" type="tel" value={driver.emergency_phone} /></div>
+          <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', margin: '16px 0 10px', paddingBottom: '6px', borderBottom: '.5px solid var(--border)' }}>🚛 Licence &amp; compliance</div>
+          <div className="form-grid">
+            <FormField label="Licence category" id="df-lc" name="licence_category" value={driver.licence_category} options={['Class 1', 'Class 2', '7.5T', 'Van', 'Car']} required />
+            <FormField label="Employment type" id="df-et" name="employment_type" value={driver.employment_type?.toLowerCase().replace(' ', '-')} options={[{ v: 'self-employed', l: 'Self-employed' }, { v: 'paye', l: 'PAYE' }]} required />
+            <FormField label="CPC expiry date" id="df-cpx" name="cpc_expiry" type="date" value={driver.cpc_expiry?.slice(0, 10)} />
+            <FormField label="Status" id="df-status" name="status" value={driver.status} options={[{ v: 'available', l: 'Available' }, { v: 'active', l: 'Active' }, { v: 'suspended', l: 'Suspended' }]} />
+          </div>
+        </form>
       </div>,
       <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between' }}>
         <button className="btn btn-sm" style={{ color: 'var(--red)', background: 'rgba(232, 70, 10, 0.08)' }} onClick={async () => {
@@ -87,7 +117,7 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
         }}>Delete driver</button>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="btn btn-sm" onClick={closeModal}>Cancel</button>
-          <button className="btn btn-primary btn-sm" style={{ minWidth: '120px' }} onClick={() => { toast('Driver updated ✓'); closeModal(); }}>Save changes</button>
+          <button type="submit" form="edit-driver-form" className="btn btn-primary btn-sm" style={{ minWidth: '120px' }}>Save changes</button>
         </div>
       </div>
     );
@@ -96,41 +126,32 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
   function showUploadDocument() {
     openModal(
       'Upload new document',
-      <div>
-        <FormField label="Document type" id="doc-type" options={['Driving licence', 'CPC card', 'Tacho card', 'Passport / Visa', 'Contract', 'Other']} required />
+      <form id="upload-doc-form" onSubmit={async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget);
+        const docType = fd.get('doc_type') as string;
+        const file = fd.get('file') as File;
+        if (!file || !file.name) return toast('Select a file', 'err');
+        const result = await uploadDocument('driver', driver.id, docType, file);
+        if (result) {
+          const docs = await fetchDocuments('driver', driver.id);
+          setDocuments(docs);
+          toast('Document uploaded ✓');
+          closeModal();
+        } else {
+          toast('Upload failed', 'err');
+        }
+      }}>
+        <FormField label="Document type" id="doc-type" name="doc_type" options={['Driving licence', 'CPC card', 'Tacho card', 'Passport / Visa', 'Contract', 'Other']} required />
         <div style={{ marginBottom: '16px', marginTop: '16px' }}>
           <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '6px', color: 'var(--text2)' }}>Select file</label>
-          <input type="file" style={{ fontSize: '13px', width: '100%' }} required />
+          <input type="file" name="file" style={{ fontSize: '13px', width: '100%' }} required />
         </div>
-      </div>,
+      </form>,
       <>
         <button className="btn btn-sm" onClick={closeModal}>Cancel</button>
-        <button className="btn btn-primary btn-sm" onClick={() => { toast('Document uploaded ✓'); closeModal(); }}>Upload</button>
+        <button type="submit" form="upload-doc-form" className="btn btn-primary btn-sm">Upload</button>
       </>
-    );
-  }
-
-  function showDocument(docName: string) {
-    openModal(
-      `View Document — ${docName}`,
-      <div style={{ padding: '30px', background: 'var(--bg-mid)', borderRadius: '8px', textAlign: 'center', minHeight: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border)' }}>
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="1.5" style={{ opacity: 0.8, marginBottom: '16px' }}>
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-          <polyline points="14 2 14 8 20 8"></polyline>
-          <line x1="16" y1="13" x2="8" y2="13"></line>
-          <line x1="16" y1="17" x2="8" y2="17"></line>
-          <polyline points="10 9 9 9 8 9"></polyline>
-        </svg>
-        <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text1)' }}>{docName}</div>
-        <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '6px', maxWidth: '250px', lineHeight: '1.4' }}>In a live environment, the actual PDF or image file renders here securely from Supabase Storage.</div>
-      </div>,
-      <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between' }}>
-        <button className="btn btn-sm" style={{ color: 'var(--red)', background: 'rgba(232, 70, 10, 0.08)' }} onClick={() => { toast('Document deleted'); closeModal(); }}>Delete</button>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn btn-sm" onClick={closeModal}>Close</button>
-          <button className="btn btn-primary btn-sm" onClick={() => { toast('Download started'); closeModal(); }}>Download</button>
-        </div>
-      </div>
     );
   }
 
@@ -151,16 +172,15 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
             <div className="phero-name">{driver.first_name} {driver.last_name}</div>
             <div className="phero-meta">{driver.phone} · {driver.email || 'No email'} · {driver.address || 'No address'}</div>
             <div className="phero-badges">
-              <span className="badge badge-blue">{driver.licence_category}</span>
-              <span className="badge badge-gray">{driver.employment_type}</span>
-              <span className={`badge badge-${driver.rtw_type === 'passport' ? 'green' : 'amber'}`}>{driver.rtw_type === 'passport' ? 'UK Passport — RTW ✓' : 'Visa'}</span>
+              <span className="badge badge-blue">{driver.licence_category || 'No licence'}</span>
+              <span className="badge badge-gray">{driver.employment_type || '—'}</span>
+              {driver.rtw_type && <span className={`badge badge-${driver.rtw_type === 'passport' ? 'green' : 'amber'}`}>{driver.rtw_type === 'passport' ? 'UK Passport — RTW ✓' : 'Visa'}</span>}
               {driver.cpc_expiry && isExp(driver.cpc_expiry) && <span className="badge badge-red">CPC Expired</span>}
             </div>
             <div className="phero-stats">
-              <div className="ps"><div className="ps-label">Total shifts</div><div className="ps-val">{driver.total_shifts || 0}</div></div>
-              <div className="ps"><div className="ps-label">Total hours</div><div className="ps-val">{fmt(driver.total_hours)}h</div></div>
-              <div className="ps"><div className="ps-label">Total earned</div><div className="ps-val" style={{ color: 'var(--green-mid)' }}>£{fmt(driver.total_earned)}</div></div>
-              <div className="ps"><div className="ps-label">Pending pay</div><div className="ps-val" style={{ color: 'var(--amber)' }}>£{fmt(driver.pending_pay)}</div></div>
+              <div className="ps"><div className="ps-label">Total shifts</div><div className="ps-val">{totalShifts}</div></div>
+              <div className="ps"><div className="ps-label">Total hours</div><div className="ps-val">{fmt(totalHours)}h</div></div>
+              <div className="ps"><div className="ps-label">Total earned</div><div className="ps-val" style={{ color: 'var(--green-mid)' }}>£{fmt(totalEarned)}</div></div>
               <div className="ps"><div className="ps-label">Since</div><div className="ps-val" style={{ fontSize: '14px' }}>{fmtDate(driver.created_at)}</div></div>
             </div>
           </div>
@@ -176,7 +196,7 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
               <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end' }}><button className="btn btn-primary btn-sm" onClick={showEditDriver}>Edit driver</button></div>
             </div>
             <div className="card"><div className="card-title">Compliance &amp; licence</div>
-              {[['Licence category', driver.licence_category], ['Licence number', driver.licence_number], ['CPC number', driver.cpc_number], ['CPC expiry', driver.cpc_expiry ? (isExp(driver.cpc_expiry) ? `${fmtDate(driver.cpc_expiry)} — EXPIRED` : fmtDate(driver.cpc_expiry)) : '—'], ['Tacho card', driver.tacho_card], ['Right to work', driver.rtw_type], ['UTR number', driver.utr_number], ['Employment type', driver.employment_type]].map(([l, v]) => (
+              {[['Licence category', driver.licence_category], ['Licence number', driver.licence_number], ['CPC number', driver.cpc_number], ['CPC expiry', driver.cpc_expiry ? (isExp(driver.cpc_expiry) ? `${fmtDate(driver.cpc_expiry)} — EXPIRED` : fmtDate(driver.cpc_expiry)) : '—'], ['Tacho card', driver.tacho_card], ['Right to work', driver.rtw_type], ['UTR number', driver.utr_number], ['NI number', driver.ni_number], ['Tax code', driver.tax_code], ['Share code', driver.share_code], ['Employment type', driver.employment_type]].map(([l, v]) => (
                 <div className="lr" key={l as string}><span style={{ flex: 1, fontSize: '11.5px', color: 'var(--text3)' }}>{l}</span><span style={{ fontWeight: 500, color: String(v).includes('EXPIRED') ? 'var(--red)' : undefined }}>{v || '—'}</span></div>
               ))}
             </div>
@@ -185,14 +205,17 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
 
         {activeTab === 1 && (
           <div className="doc-grid">
-            {[{ name: 'Driving licence', valid: true }, { name: 'CPC card', valid: false }, { name: 'Tacho card', valid: true }, { name: 'Passport', valid: true }, { name: 'Contract', valid: true }].map((doc) => (
-              <div className="dc" key={doc.name} onClick={() => showDocument(doc.name)} style={{ cursor: 'pointer' }}>
+            {documents.map((doc: any) => (
+              <div className="dc" key={doc.id} style={{ cursor: 'pointer' }}>
                 <div className="dc-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="1" width="12" height="16" rx="1.5"/><line x1="6" y1="6" x2="12" y2="6"/></svg></div>
-                <div className="dc-name">{doc.name}</div>
-                <div className="dc-sub">1 file</div>
-                <span className={`badge ${doc.valid ? 'badge-green' : 'badge-red'}`} style={{ marginTop: '6px' }}>{doc.valid ? 'Valid' : 'Expired'}</span>
+                <div className="dc-name">{doc.doc_type}</div>
+                <div className="dc-sub">{doc.file_name}</div>
+                <span className="badge badge-green" style={{ marginTop: '6px' }}>Uploaded</span>
               </div>
             ))}
+            {documents.length === 0 && (
+              <div style={{ gridColumn: '1 / -1', padding: '30px', textAlign: 'center', color: 'var(--text3)', fontSize: '13px' }}>No documents uploaded yet</div>
+            )}
             <div className="dc empty-card" style={{ minHeight: '90px', cursor: 'pointer' }} onClick={showUploadDocument}>
               <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="10" y1="4" x2="10" y2="16"/><line x1="4" y1="10" x2="16" y2="10"/></svg>
               <div className="dc-sub">Upload document</div>
@@ -203,23 +226,26 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
         {activeTab === 2 && (
           <>
             <div className="g4" style={{ marginBottom: '16px' }}>
-              <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Total runs</div><div className="mcard-val">{driver.total_shifts}</div></div>
-              <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Total hours</div><div className="mcard-val">{fmt(driver.total_hours)}h</div></div>
-              <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Driver pay</div><div className="mcard-val vg">£{fmt(driver.total_earned)}</div></div>
-              <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Pending</div><div className="mcard-val va">£{fmt(driver.pending_pay)}</div></div>
+              <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Total runs</div><div className="mcard-val">{totalShifts}</div></div>
+              <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Total hours</div><div className="mcard-val">{fmt(totalHours)}h</div></div>
+              <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Driver pay</div><div className="mcard-val vg">£{fmt(totalEarned)}</div></div>
+              <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Orders</div><div className="mcard-val">{driverOrders.length}</div></div>
             </div>
-            <div className="card" style={{ marginBottom: '14px' }}><div className="card-title">Earnings — weekly breakdown</div><div style={{ position: 'relative', height: '160px' }}><canvas ref={chartRef}></canvas></div></div>
+            {driverOrders.length > 0 && (
+              <div className="card" style={{ marginBottom: '14px' }}><div className="card-title">Earnings — per order</div><div style={{ position: 'relative', height: '160px' }}><canvas ref={chartRef}></canvas></div></div>
+            )}
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
               <table className="dt">
                 <thead><tr><th style={{ paddingLeft: '14px' }}>Order</th><th>Company</th><th>Date</th><th>Route</th><th>Hours</th><th>Pay</th><th>Billed</th><th>Margin</th><th>Status</th></tr></thead>
                 <tbody>
+                  {driverOrders.length === 0 && <tr><td colSpan={9} style={{ textAlign: 'center', padding: '20px', color: 'var(--text3)' }}>No orders assigned yet</td></tr>}
                   {driverOrders.map(o => (
                     <tr key={o.ref}>
-                      <td style={{ paddingLeft: '14px' }}><span className={`mono ${o.status === 'Cancelled' ? '' : 'lnk'}`} style={o.status === 'Cancelled' ? { color: 'var(--red)' } : {}}>{o.ref}</span></td>
+                      <td style={{ paddingLeft: '14px' }}><span className="mono lnk">{o.ref}</span></td>
                       <td><Link href={`/companies/${o.coId}`} className="lnk">{o.company}</Link></td>
                       <td>{o.date}</td><td>{o.route}</td><td>{o.hours}</td><td>{o.pay}</td><td>{o.billed}</td>
-                      <td style={{ color: o.margin !== '—' ? 'var(--green-mid)' : undefined, fontWeight: 600 }}>{o.margin}</td>
-                      <td><span className={`badge badge-${o.status === 'Completed' ? 'green' : 'red'}`}>{o.status}</span></td>
+                      <td style={{ color: o.margin !== '-' ? 'var(--green-mid)' : undefined, fontWeight: 600 }}>{o.margin}</td>
+                      <td><span className={`badge badge-${o.status === 'completed' ? 'green' : o.status === 'active' ? 'blue' : 'amber'}`}>{o.status}</span></td>
                     </tr>
                   ))}
                 </tbody>
@@ -231,18 +257,18 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
         {activeTab === 3 && (
           <>
             <div className="fin-hero">
-              <div className="fh fg"><div className="fh-label">Total paid out</div><div className="fh-val" style={{ color: 'var(--green-mid)' }}>£{fmt(driver.total_earned)}</div></div>
-              <div className="fh fa"><div className="fh-label">Pending</div><div className="fh-val" style={{ color: 'var(--amber)' }}>£{fmt(driver.pending_pay)}</div></div>
-              <div className="fh"><div className="fh-label">Total runs</div><div className="fh-val">{driver.total_shifts}</div></div>
+              <div className="fh fg"><div className="fh-label">Total paid out</div><div className="fh-val" style={{ color: 'var(--green-mid)' }}>£{fmt(totalEarned)}</div></div>
+              <div className="fh"><div className="fh-label">Total runs</div><div className="fh-val">{totalShifts}</div></div>
+              <div className="fh"><div className="fh-label">Total hours</div><div className="fh-val">{fmt(totalHours)}h</div></div>
             </div>
             <div className="card"><div className="card-title">Payment history</div>
-              {[{ week: '18 Apr', hrs: '42h', runs: 2, amount: 630, status: 'Due', ref: 'PAY-PEND' }, { week: '11 Apr', hrs: '36h', runs: 3, amount: 540, status: 'Paid', ref: 'PAY-203' }, { week: '4 Apr', hrs: '42h', runs: 4, amount: 630, status: 'Paid', ref: 'PAY-198' }].map(p => (
-                <div className="prow" key={p.ref} style={{ borderBottom: '.5px solid var(--border)' }}>
-                  <span className="pd pd-out">OUT</span>
-                  <div className="lr-info"><div className="lr-name">Week ending {p.week} · {p.hrs} · {p.runs} runs</div><div className="lr-meta mono">{p.ref}</div></div>
-                  <div className="lr-amt" style={{ color: p.status === 'Paid' ? 'var(--green-mid)' : 'var(--amber)' }}>£{fmt(p.amount)}</div>
-                  <span className={`badge badge-${p.status === 'Paid' ? 'green' : 'amber'}`} style={{ marginLeft: '8px' }}>{p.status}</span>
-                  <span className={`proof-dot ${p.status === 'Paid' ? 'pg-dot' : 'pr-dot'}`}>{p.status === 'Paid' ? '✓' : '!'}</span>
+              {driverPayments.length === 0 && <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text3)', fontSize: '13px' }}>No payments recorded yet</div>}
+              {driverPayments.map((p: any) => (
+                <div className="prow" key={p.id} style={{ borderBottom: '.5px solid var(--border)' }}>
+                  <span className={`pd pd-${p.direction}`}>{p.direction === 'out' ? 'OUT' : 'IN'}</span>
+                  <div className="lr-info"><div className="lr-name">{fmtDate(p.pay_date)} · {p.method || 'bank_transfer'}</div><div className="lr-meta mono">{p.payment_ref}</div></div>
+                  <div className="lr-amt" style={{ color: p.status === 'paid' ? 'var(--green-mid)' : 'var(--amber)' }}>£{fmt(p.amount)}</div>
+                  <span className={`badge badge-${p.status === 'paid' ? 'green' : 'amber'}`} style={{ marginLeft: '8px' }}>{p.status}</span>
                 </div>
               ))}
             </div>
@@ -252,9 +278,10 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
         {activeTab === 4 && (
           <div className="card"><div className="card-title">Activity log</div>
             <div className="afeed">
-              {DEMO_ACTIVITY.map((a, i) => (
+              {activityLog.length === 0 && <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text3)', fontSize: '13px' }}>No activity recorded yet</div>}
+              {activityLog.map((a, i) => (
                 <div className="aitem" key={a.id}>
-                  <div className="aleft"><div className="adot" style={{ background: a.action.includes('created') ? 'var(--green-mid)' : 'var(--brand)' }}></div>{i < DEMO_ACTIVITY.length - 1 && <div className="aline"></div>}</div>
+                  <div className="aleft"><div className="adot" style={{ background: a.action?.includes('created') ? 'var(--green-mid)' : 'var(--brand)' }}></div>{i < activityLog.length - 1 && <div className="aline"></div>}</div>
                   <div><div className="atext">{a.action}{a.field_changed ? <> — <strong>{a.field_changed}</strong></> : ''}{a.old_value ? <> from <em>{a.old_value}</em></> : ''}{a.new_value ? <> → <strong>{a.new_value}</strong></> : ''}</div><div className="atime">{fmtDate(a.performed_at)} · by {a.performed_by_name || 'System'}</div></div>
                 </div>
               ))}

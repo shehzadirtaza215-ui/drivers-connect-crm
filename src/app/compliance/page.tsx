@@ -18,19 +18,21 @@ export default function CompliancePage() {
 
   const expired = alerts.filter(a => isExp(a.expiry_date)).length;
   const expiringSoon = alerts.filter(a => !isExp(a.expiry_date) && (dLeft(a.expiry_date) || 999) <= 30).length;
+  const allClear = alerts.filter(a => !isExp(a.expiry_date) && (dLeft(a.expiry_date) || 999) > 30).length;
 
   return (
     <>
       <div className="topbar"><div className="page-title">Compliance</div></div>
       <div className="content">
         <div className="g4" style={{ marginBottom: '16px' }}>
-          <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">All clear</div><div className="mcard-val vg">18</div></div>
+          <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">All clear</div><div className="mcard-val vg">{allClear}</div></div>
           <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Expiring soon</div><div className="mcard-val va">{expiringSoon}</div></div>
           <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Expired</div><div className="mcard-val vr">{expired}</div></div>
-          <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Missing docs</div><div className="mcard-val va">3</div></div>
+          <div className="mcard" style={{ cursor: 'default' }}><div className="mcard-label">Total alerts</div><div className="mcard-val">{alerts.length}</div></div>
         </div>
         <div className="card">
           <div className="card-title">All expiry alerts</div>
+          {alerts.length === 0 && <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text3)', fontSize: '13px' }}>No compliance alerts — all clear ✓</div>}
           {alerts.map(a => {
             const exp = isExp(a.expiry_date);
             const days = dLeft(a.expiry_date);
