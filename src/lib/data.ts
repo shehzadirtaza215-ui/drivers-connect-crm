@@ -88,11 +88,11 @@ export async function fetchCompany(id: number): Promise<Company | null> {
   return data;
 }
 
-export async function createCompany(company: Partial<Company>): Promise<Company | null> {
+export async function createCompany(company: Partial<Company>): Promise<{ data: Company | null, error: any }> {
   const { data, error } = await sb().from('companies').insert(company as never).select().single();
-  if (error) { console.error('createCompany error:', error); return null; }
+  if (error) { console.error('createCompany error:', error); return { data: null, error }; }
   if (data) await logActivity({ entity_type: 'company', entity_id: (data as any).id, action: 'Company created', new_value: (data as any).name });
-  return data;
+  return { data, error: null };
 }
 
 export async function updateCompany(id: number, updates: Partial<Company>): Promise<Company | null> {

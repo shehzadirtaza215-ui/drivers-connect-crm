@@ -30,18 +30,19 @@ export default function CompaniesPage() {
       licence_required: fd.get('licence_required') as string,
       rate_per_hour: Number(fd.get('rate_per_hour')) || 0,
       payment_terms_days: Number(fd.get('payment_terms_days')) || 30,
-      status: 'active',
+      notes: fd.get('notes') as string,
+      status: fd.get('status') as string || 'active',
       avatar_color: '#1a1a2e',
       avatar_text_color: '#fff',
     };
     
-    const created = await createCompany(newCompany);
+    const { data: created, error } = await createCompany(newCompany);
     if (created) {
       setCompanies(prev => [created, ...prev]);
       toast('Company added successfully ✓');
       closeModal();
     } else {
-      toast('Error adding company', 'err');
+      toast(`Error: ${error?.message || 'Failed to add company'}`, 'err');
     }
   }
 
@@ -62,7 +63,9 @@ export default function CompaniesPage() {
           <FormField label="Licence required" id="cf-lic" name="licence_required" options={[{ v: '', l: 'Any licence' }, { v: 'Class 1', l: 'Class 1 (C+E)' }, { v: 'Class 2', l: 'Class 2 (C)' }, { v: '7.5T', l: '7.5 Tonne' }, { v: 'Van', l: 'Van' }]} />
           <FormField label="Our charge rate (£/hr)" id="cf-rate" name="rate_per_hour" type="number" />
           <FormField label="Payment terms (days)" id="cf-terms" name="payment_terms_days" type="number" value={14} />
+          <FormField label="Status" id="cf-status" name="status" options={[{ v: 'active', l: 'Active' }, { v: 'inactive', l: 'Inactive' }]} />
         </div>
+        <FormField label="Notes / special instructions" id="cf-notes" name="notes" />
       </form>,
       <><button className="btn btn-sm" onClick={closeModal}>Cancel</button><button type="submit" form="add-company-form" className="btn btn-primary btn-sm" style={{ minWidth: '130px' }}>Add company</button></>
     );
