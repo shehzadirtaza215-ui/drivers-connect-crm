@@ -123,11 +123,11 @@ export async function fetchOrders(status?: string): Promise<Order[]> {
   }) as Order[];
 }
 
-export async function createOrder(order: Partial<Order>): Promise<Order | null> {
+export async function createOrder(order: Partial<Order>): Promise<{ data: Order | null, error: any }> {
   const { data, error } = await sb().from('orders').insert(order as never).select().single();
-  if (error) { console.error('createOrder error:', error); return null; }
+  if (error) { console.error('createOrder error:', error); return { data: null, error }; }
   if (data) await logActivity({ entity_type: 'order', entity_id: (data as any).id, action: 'Order created', new_value: (data as any).order_ref });
-  return data;
+  return { data, error: null };
 }
 
 export async function updateOrder(id: number, updates: Partial<Order>): Promise<Order | null> {
@@ -147,8 +147,8 @@ export async function deleteOrder(id: number): Promise<boolean> {
 
 export async function createOrderDriver(od: { order_id: number; driver_id: number; driver_rate: number; start_address?: string }) {
   const { data, error } = await sb().from('order_drivers').insert(od as never).select().single();
-  if (error) { console.error('createOrderDriver error:', error); return null; }
-  return data;
+  if (error) { console.error('createOrderDriver error:', error); return { data: null, error }; }
+  return { data, error: null };
 }
 
 export async function updateOrderDriverHours(orderId: number, hours: number) {

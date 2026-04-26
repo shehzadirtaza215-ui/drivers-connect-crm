@@ -33,7 +33,7 @@ export default function OrdersPage() {
     const fd = new FormData(e.currentTarget);
     const coId = Number(fd.get('company_id'));
     if (!companies.find(c => c.id === coId)) return;
-    const created = await createOrder({
+    const { data: created, error } = await createOrder({
       company_id: coId, placed_by: fd.get('placed_by') as string,
       start_datetime: fd.get('start_datetime') as string, start_address: fd.get('start_address') as string,
       end_address: fd.get('end_address') as string, licence_required: fd.get('licence_required') as string,
@@ -41,7 +41,7 @@ export default function OrdersPage() {
       drivers_needed: Number(fd.get('drivers_needed')) || 1, status: 'draft', hours_done: 0,
     } as Partial<Order>);
     if (created) { await refreshOrders(); toast('Order created ✓'); closeModal(); }
-    else toast('Error creating order', 'err');
+    else toast(`Error: ${error?.message || 'Failed to create order'}`, 'err');
   }
 
   async function handleAssignDriver(e: React.FormEvent<HTMLFormElement>, orderId: number) {
@@ -52,8 +52,8 @@ export default function OrdersPage() {
     if (!driverId) return toast('Please select a driver', 'err');
 
     // Create order_drivers record (proper junction table)
-    const od = await createOrderDriver({ order_id: orderId, driver_id: driverId, driver_rate: driverRate, start_address: fd.get('driver_addr') as string || undefined });
-    if (!od) return toast('Error assigning driver', 'err');
+    const { data: od, error } = await createOrderDriver({ order_id: orderId, driver_id: driverId, driver_rate: driverRate, start_address: fd.get('driver_addr') as string || undefined });
+    if (!od) return toast(`Error: ${error?.message || 'Failed to assign driver'}`, 'err');
 
     // Update order status to active
     await updateOrder(orderId, { status: 'active' } as Partial<Order>);
