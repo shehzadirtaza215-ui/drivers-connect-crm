@@ -76,7 +76,16 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
         <form id="edit-driver-form" onSubmit={async (e) => {
           e.preventDefault();
           const fd = new FormData(e.currentTarget);
-          const updates: any = { first_name: fd.get('first_name'), last_name: fd.get('last_name'), phone: fd.get('phone'), email: fd.get('email'), address: fd.get('address'), emergency_contact: fd.get('emergency_contact'), emergency_phone: fd.get('emergency_phone'), licence_category: fd.get('licence_category'), employment_type: fd.get('employment_type'), cpc_expiry: fd.get('cpc_expiry') || null, status: fd.get('status') };
+          const fn = (fd.get('first_name') as string || '').trim();
+          const ln = (fd.get('last_name') as string || '').trim();
+          const updates: any = {
+            first_name: fn, last_name: ln, initials: ((fn[0] || '') + (ln[0] || '')).toUpperCase(), phone: fd.get('phone'), email: fd.get('email'), address: fd.get('address'),
+            emergency_contact: fd.get('emergency_contact'), emergency_phone: fd.get('emergency_phone'),
+            licence_category: fd.get('licence_category'), employment_type: fd.get('employment_type'),
+            licence_number: fd.get('licence_number'), cpc_number: fd.get('cpc_number'), cpc_expiry: fd.get('cpc_expiry') || null, tacho_card: fd.get('tacho_card'),
+            rtw_type: fd.get('rtw_type'), rtw_expiry: fd.get('rtw_expiry') || null, share_code: fd.get('share_code'),
+            utr_number: fd.get('utr_number'), ni_number: fd.get('ni_number'), tax_code: fd.get('tax_code'), status: fd.get('status')
+          };
           const updated = await updateDriver(driver.id, updates);
           if (updated) { setDriver({ ...driver, ...updated }); toast('Driver updated ✓'); closeModal(); }
           else toast('Error updating driver', 'err');
@@ -88,7 +97,22 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
           <div className="form-grid">
             <FormField label="Licence category" id="df-lc" name="licence_category" value={driver.licence_category} options={['Class 1', 'Class 2', '7.5T', 'Van', 'Car']} required />
             <FormField label="Employment type" id="df-et" name="employment_type" value={driver.employment_type?.toLowerCase().replace(' ', '-')} options={[{ v: 'self-employed', l: 'Self-employed' }, { v: 'paye', l: 'PAYE' }]} required />
+            <FormField label="Licence number" id="df-lno" name="licence_number" value={driver.licence_number} />
+            <FormField label="CPC number" id="df-cpn" name="cpc_number" value={driver.cpc_number} />
             <FormField label="CPC expiry date" id="df-cpx" name="cpc_expiry" type="date" value={driver.cpc_expiry?.slice(0, 10)} />
+            <FormField label="Tacho card no." id="df-tac" name="tacho_card" value={driver.tacho_card} />
+          </div>
+          <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', margin: '16px 0 10px', paddingBottom: '6px', borderBottom: '.5px solid var(--border)' }}>🪪 Right to work</div>
+          <div className="form-grid">
+            <FormField label="RTW type" id="df-rtw" name="rtw_type" value={driver.rtw_type} options={[{ v: 'passport', l: 'UK/EU Passport' }, { v: 'visa', l: 'Visa' }, { v: 'share_code', l: 'Share code' }]} />
+            <FormField label="RTW expiry (if visa)" id="df-rtwx" name="rtw_expiry" type="date" value={driver.rtw_expiry?.slice(0, 10)} />
+            <FormField label="Share code (if applicable)" id="df-sc" name="share_code" value={driver.share_code} />
+          </div>
+          <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', margin: '16px 0 10px', paddingBottom: '6px', borderBottom: '.5px solid var(--border)' }}>💷 Payroll &amp; tax</div>
+          <div className="form-grid">
+            <FormField label="UTR number" id="df-utr" name="utr_number" value={driver.utr_number} />
+            <FormField label="NI number" id="df-ni" name="ni_number" value={driver.ni_number} />
+            <FormField label="Tax code" id="df-tax" name="tax_code" value={driver.tax_code} />
             <FormField label="Status" id="df-status" name="status" value={driver.status} options={[{ v: 'available', l: 'Available' }, { v: 'active', l: 'Active' }, { v: 'suspended', l: 'Suspended' }]} />
           </div>
         </form>
