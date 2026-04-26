@@ -23,10 +23,12 @@ export default function DriversPage() {
   async function handleAddDriver(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    const fn = (fd.get('first_name') as string || '').trim();
+    const ln = (fd.get('last_name') as string || '').trim();
     const newDriver: any = {
-      initials: `${(fd.get('first_name') as string)[0]}${(fd.get('last_name') as string)[0]}`.toUpperCase(),
-      first_name: fd.get('first_name') as string,
-      last_name: fd.get('last_name') as string,
+      initials: ((fn[0] || '') + (ln[0] || '')).toUpperCase(),
+      first_name: fn,
+      last_name: ln,
       phone: fd.get('phone') as string,
       email: fd.get('email') as string,
       address: fd.get('address') as string,
