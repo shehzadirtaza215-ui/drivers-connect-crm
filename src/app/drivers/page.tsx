@@ -34,6 +34,15 @@ export default function DriversPage() {
       emergency_phone: fd.get('emergency_phone') as string,
       licence_category: fd.get('licence_category') as string,
       employment_type: fd.get('employment_type') as string,
+      licence_number: fd.get('licence_number') as string,
+      cpc_number: fd.get('cpc_number') as string,
+      cpc_expiry: fd.get('cpc_expiry') as string || null,
+      tacho_card: fd.get('tacho_card') as string,
+      rtw_type: fd.get('rtw_type') as string,
+      rtw_expiry: fd.get('rtw_expiry') as string || null,
+      utr_number: fd.get('utr_number') as string,
+      ni_number: fd.get('ni_number') as string,
+      tax_code: fd.get('tax_code') as string,
       status: fd.get('status') as string || 'available',
       avatar_color: '#e8f1fb',
       avatar_text_color: '#185fa5',
@@ -74,21 +83,21 @@ export default function DriversPage() {
         <div className="form-grid">
           <FormField label="Licence category" id="df-lc" name="licence_category" options={['Class 1', 'Class 2', '7.5T', 'Van', 'Car']} required />
           <FormField label="Employment type" id="df-et" name="employment_type" options={[{ v: 'self-employed', l: 'Self-employed' }, { v: 'paye', l: 'PAYE' }]} required />
-          <FormField label="Licence number" id="df-lno" />
-          <FormField label="CPC number" id="df-cpn" />
-          <FormField label="CPC expiry date" id="df-cpx" type="date" />
-          <FormField label="Tacho card no." id="df-tac" />
+          <FormField label="Licence number" id="df-lno" name="licence_number" />
+          <FormField label="CPC number" id="df-cpn" name="cpc_number" />
+          <FormField label="CPC expiry date" id="df-cpx" name="cpc_expiry" type="date" />
+          <FormField label="Tacho card no." id="df-tac" name="tacho_card" />
         </div>
         <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', margin: '16px 0 10px', paddingBottom: '6px', borderBottom: '.5px solid var(--border)' }}>🪪 Right to work</div>
         <div className="form-grid">
-          <FormField label="RTW type" id="df-rtw" options={[{ v: 'passport', l: 'UK/EU Passport' }, { v: 'visa', l: 'Visa' }, { v: 'share_code', l: 'Share code' }]} />
-          <FormField label="RTW expiry (if visa)" id="df-rtwx" type="date" />
+          <FormField label="RTW type" id="df-rtw" name="rtw_type" options={[{ v: 'passport', l: 'UK/EU Passport' }, { v: 'visa', l: 'Visa' }, { v: 'share_code', l: 'Share code' }]} />
+          <FormField label="RTW expiry (if visa)" id="df-rtwx" name="rtw_expiry" type="date" />
         </div>
         <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', margin: '16px 0 10px', paddingBottom: '6px', borderBottom: '.5px solid var(--border)' }}>💷 Payroll &amp; tax</div>
         <div className="form-grid">
-          <FormField label="UTR number" id="df-utr" />
-          <FormField label="NI number" id="df-ni" />
-          <FormField label="Tax code" id="df-tax" />
+          <FormField label="UTR number" id="df-utr" name="utr_number" />
+          <FormField label="NI number" id="df-ni" name="ni_number" />
+          <FormField label="Tax code" id="df-tax" name="tax_code" />
           <FormField label="Status" id="df-status" name="status" options={[{ v: 'available', l: 'Available' }, { v: 'active', l: 'Active' }, { v: 'suspended', l: 'Suspended' }]} />
         </div>
       </form>,
