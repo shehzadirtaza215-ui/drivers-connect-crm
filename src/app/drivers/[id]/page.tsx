@@ -103,9 +103,15 @@ export default function DriverProfilePage({ params }: { params: Promise<{ id: st
           }
           if (newAvatarUrl) updates.avatar_url = newAvatarUrl;
 
+          const btn = document.querySelector('button[form="edit-driver-form"]') as HTMLButtonElement;
+          if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
           const updated = await updateDriver(driver.id, updates);
           if (updated) { setDriver({ ...driver, ...updated }); toast('Driver updated ✓'); closeModal(); }
-          else toast('Error updating driver', 'err');
+          else {
+            if (btn) { btn.disabled = false; btn.textContent = 'Save changes'; }
+            toast('Error updating driver', 'err');
+          }
         }}>
           <div className="form-grid"><FormField label="First name" id="df-fn" name="first_name" value={driver.first_name} required /><FormField label="Last name" id="df-ln" name="last_name" value={driver.last_name} required /><FormField label="Phone" id="df-ph" name="phone" type="tel" value={driver.phone} /><FormField label="Email" id="df-em" name="email" type="email" value={driver.email} /></div>
           <FormField label="Home address" id="df-addr" name="address" value={driver.address} />

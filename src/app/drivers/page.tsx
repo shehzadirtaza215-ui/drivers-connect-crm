@@ -51,6 +51,9 @@ export default function DriversPage() {
       avatar_text_color: '#185fa5',
     };
     
+    const btn = document.querySelector('button[form="add-driver-form"]') as HTMLButtonElement;
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
     const { data: created, error } = await createDriver(newDriver);
     if (created) {
       const file = fd.get('avatar') as File;
@@ -65,6 +68,7 @@ export default function DriversPage() {
       toast('Driver added successfully ✓');
       closeModal();
     } else {
+      if (btn) { btn.disabled = false; btn.textContent = 'Add driver'; }
       toast(`Error: ${error?.message || 'Failed to add driver'}`, 'err');
     }
   }

@@ -103,9 +103,15 @@ export default function CompanyProfilePage({ params }: { params: Promise<{ id: s
           }
           if (newAvatarUrl) updates.avatar_url = newAvatarUrl;
 
+          const btn = document.querySelector('button[form="edit-company-form"]') as HTMLButtonElement;
+          if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
           const updated = await updateCompany(co.id, updates); 
           if (updated) { setCompany({ ...co, ...updated }); toast('Company updated ✓'); closeModal(); } 
-          else toast('Error updating company', 'err'); 
+          else {
+            if (btn) { btn.disabled = false; btn.textContent = 'Save changes'; }
+            toast('Error updating company', 'err'); 
+          }
         }}>
           <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', paddingBottom: '6px', borderBottom: '.5px solid var(--border)' }}>🏢 Company details</div>
           <div className="form-grid"><FormField label="Company code" id="cf-code" name="code" value={co.code} required /><FormField label="Full name" id="cf-name" name="name" value={co.name} required /></div>

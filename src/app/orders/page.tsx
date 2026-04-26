@@ -33,6 +33,9 @@ export default function OrdersPage() {
     const fd = new FormData(e.currentTarget);
     const coId = Number(fd.get('company_id'));
     if (!companies.find(c => c.id === coId)) return;
+    const btn = document.querySelector('button[form="create-order-form"]') as HTMLButtonElement;
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
     const { data: created, error } = await createOrder({
       company_id: coId, placed_by: fd.get('placed_by') as string,
       start_datetime: fd.get('start_datetime') as string, start_address: fd.get('start_address') as string,
@@ -41,7 +44,10 @@ export default function OrdersPage() {
       drivers_needed: Number(fd.get('drivers_needed')) || 1, status: 'draft', hours_done: 0,
     } as Partial<Order>);
     if (created) { await refreshOrders(); toast('Order created ✓'); closeModal(); }
-    else toast(`Error: ${error?.message || 'Failed to create order'}`, 'err');
+    else {
+      if (btn) { btn.disabled = false; btn.textContent = 'Create order'; }
+      toast(`Error: ${error?.message || 'Failed to create order'}`, 'err');
+    }
   }
 
   async function handleAssignDriver(e: React.FormEvent<HTMLFormElement>, orderId: number) {
@@ -51,9 +57,15 @@ export default function OrdersPage() {
     const driverRate = Number(fd.get('driver_rate')) || 14;
     if (!driverId) return toast('Please select a driver', 'err');
 
+    const btn = document.querySelector('button[form="assign-driver-form"]') as HTMLButtonElement;
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
     // Create order_drivers record (proper junction table)
     const { data: od, error } = await createOrderDriver({ order_id: orderId, driver_id: driverId, driver_rate: driverRate, start_address: fd.get('driver_addr') as string || undefined });
-    if (!od) return toast(`Error: ${error?.message || 'Failed to assign driver'}`, 'err');
+    if (!od) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Assign driver'; }
+      return toast(`Error: ${error?.message || 'Failed to assign driver'}`, 'err');
+    }
 
     // Update order status to active
     await updateOrder(orderId, { status: 'active' } as Partial<Order>);
@@ -68,9 +80,12 @@ export default function OrdersPage() {
     const hrs = Number(fd.get('hours_done'));
     if (hrs <= 0) return toast('Enter valid hours done', 'err');
 
-    // Update hours on both the order AND all order_drivers records
-    await updateOrder(orderId, { status: 'completed', hours_done: hrs } as Partial<Order>);
-    await updateOrderDriverHours(orderId, hrs);
+    const btn = document.querySelector('button[form="complete-order-form"]') as HTMLButtonElement;
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
+    const hours = Number(fd.get('hours_done')) || 8;
+    await updateOrder(orderId, { status: 'completed', hours_done: hours, notes: fd.get('notes') as string } as Partial<Order>);
+    await updateOrderDriverHours(orderId, hours);
     await refreshOrders();
     toast('Order completed ✓');
     closeModal();

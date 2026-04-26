@@ -36,6 +36,9 @@ export default function CompaniesPage() {
       avatar_text_color: '#fff',
     };
     
+    const btn = document.querySelector('button[form="add-company-form"]') as HTMLButtonElement;
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
     const { data: created, error } = await createCompany(newCompany);
     if (created) {
       const file = fd.get('avatar') as File;
@@ -51,6 +54,7 @@ export default function CompaniesPage() {
       toast('Company added successfully ✓');
       closeModal();
     } else {
+      if (btn) { btn.disabled = false; btn.textContent = 'Add company'; }
       toast(`Error: ${error?.message || 'Failed to add company'}`, 'err');
     }
   }
